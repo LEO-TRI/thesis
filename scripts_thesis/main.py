@@ -6,6 +6,12 @@ import pickle
 
 from colorama import Fore, Style
 
+from scripts_thesis.data import load_raw_data, load_processed_data
+from scripts_thesis.model_ML import train_model, evaluate_model, predict_model, load_model
+#from scripts_thesis.cleaning import clean_predict
+from scripts_thesis.params import *
+from scripts_thesis.preproc import *
+
 #####LAUNCH#####
 def main(agreement=0.8, target="sdg"):
     '''
@@ -23,12 +29,6 @@ def main(agreement=0.8, target="sdg"):
     return agreement, target
 
 #####SETUP#####
-from scripts.data import DataProcess, load_processed_data
-from scripts.utils import get_top_features, sdg_explainer, plot_confusion_matrix
-from scripts.model_ML import train_model, evaluate_model, predict_model, load_model
-from scripts.cleaning import clean_predict
-from scripts.params import *
-
 def local_setup()-> None:
     '''
     Method to create the directories for the package.
@@ -39,7 +39,7 @@ def local_setup()-> None:
             os.makedirs(file_path, exist_ok=True)
 
 #####PROCESS#####
-def preprocess(agreement:float = 0) -> None:
+def preprocess(model:bool=True) -> None:
     """
     Load the raw data from the raw_data folder.\n
     Save the data locally if not in the raw data folder.\n
@@ -50,23 +50,29 @@ def preprocess(agreement:float = 0) -> None:
     print(Fore.MAGENTA + "\n ⭐️ Use case: preprocess" + Style.RESET_ALL)
 
     # Process data
-    dp = DataProcess()
-    data_clean = dp.clean_data(grouped=True, agreement=agreement, abs_path=True)
+    df = load_raw_data()
+    data_clean = preprocess_data(df)
+
+    if model:
+        data_clean = clean_target_feature(data_clean)
+        data_clean = clean_variables_features(data_clean)
 
     k = len(data_clean)
     now = datetime.now()
 
-    file_name = f"processed_{k}_rows_{now.strftime('%d-%m-%Y-%H-%M')}.csv"
+    file_name = f"processed_{k}_rows_{now.strftime('%d-%m-%Y-%H-%M')}.parquet.gzip"
     full_file_path = os.path.join(LOCAL_DATA_PATH, file_name)
 
-    data_clean.to_csv(full_file_path)
+    data_clean.to_parquet(full_file_path,
+                compression='gzip')
+
 
     print("✅ preprocess() done \n Saved localy")
 
 #####MODEL#####
 def train(file_name:str = None,
-          target:str = "sdg",
-          test_split:float = 0.2) -> None:
+          target:str = "license",
+          test_split:float = 0.3) -> None:
 
     """
     Load data from the data folder.\n
@@ -78,11 +84,11 @@ def train(file_name:str = None,
     print(Fore.BLUE + "\nLoading preprocessed validation data..." + Style.RESET_ALL)
 
     data_processed = load_processed_data(file_name=file_name)
-    if data_processed is None:
+    if data_processed is None: #Used to exit the function and trigger an error if load_processed_data fails
         return None
 
     y= data_processed[target].astype(int)
-    X = data_processed["lemma"]
+    X = data_processed.drop(columns=[target])
 
     print(Fore.BLUE + "\nTraining model..." + Style.RESET_ALL)
     model, res = train_model(X, y, test_split)
@@ -166,7 +172,7 @@ def pred(X_pred:pd.DataFrame = None) -> np.array:
     model = load_model()
     assert model is not None
 
-    X_pred = clean_predict(X_pred)
+    #X_pred = clean_predict(X_pred)
     y_pred, y_pred_proba = predict_model(model, X_pred)
 
     sdg_dict = DataProcess().sdg
@@ -178,16 +184,16 @@ def pred(X_pred:pd.DataFrame = None) -> np.array:
 
 
 if __name__ == '__main__':
-    agreement, target = main()
+    #agreement, target = main()
     local_setup()
     print("✅ Setup done")
-    preprocess(agreement=agreement)
+    preprocess()
     print("✅ Process done")
-    train(target=target)
+    #train(target=target)
     print("✅ Train done")
-    model_viz()
+    #model_viz()
     print("✅ Viz created")
-    evaluate(target=target)
+    #evaluate(target=target)
     print("✅ Evaluate done")
-    pred()
+    #pred()
     print("✅ Pred done")

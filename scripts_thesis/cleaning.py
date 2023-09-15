@@ -7,8 +7,12 @@ import spacy_fastlang
 from spacy.language import Language
 from tqdm import tqdm
 
-nlp = spacy.load(('en_core_web_sm'))
-nlp.add_pipe("language_detector") #fast_lang comes here
+nlp_en = spacy.load(('en_core_web_sm'))
+nlp_en.add_pipe("language_detector") #fast_lang comes here
+nlp_en.remove_pipe('ner')
+
+nlp_fr = spacy.load(('fr_core_news_sm'))
+nlp_fr.remove_pipe('ner')
 
 french_stopwords = stopwords.words("french")
 translator_p = str.maketrans(string.punctuation, ' '*len(string.punctuation))
@@ -50,10 +54,16 @@ def preprocess_spacy(alpha: list[str]) -> list[str]:
     docs = list()
     mask = list()
     alpha = [str(text) for text in alpha]
-    for ind, doc in tqdm(enumerate(nlp.pipe(alpha, batch_size = 128))):
+    for ind, doc in tqdm(enumerate(nlp_en.pipe(alpha, batch_size = 128, disable=["ner"]))):
+        tokens = list()
         if doc._.language == "en":
-            tokens = list()
             for token in doc:
+                if token.pos_ in ['NOUN', 'VERB', 'ADJ']:
+                    tokens.append(token.lemma_)
+            docs.append(' '.join(tokens))
+            mask.append(ind)
+        elif doc._.language == "fr":
+            for token in nlp_fr(doc.text):
                 if token.pos_ in ['NOUN', 'VERB', 'ADJ']:
                     tokens.append(token.lemma_)
             docs.append(' '.join(tokens))

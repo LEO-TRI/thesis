@@ -10,21 +10,64 @@ from sklearn.preprocessing import RobustScaler, OneHotEncoder, FunctionTransform
 #from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
 
+
 import pandas as pd
 import numpy as np
 
 from scripts_thesis.utils import custom_combiner
+from scripts_thesis.params import *
 
 from imblearn.pipeline import Pipeline
 from imblearn.over_sampling import SMOTE
+from imblearn.under_sampling import RandomUnderSampler
 
 from colorama import Fore, Style
 
 import os
 import pickle
 
+scoring = ['accuracy', 'precision', 'recall', 'f1']
+
 def to_arr(x):
     return x.toarray()
+
+def under_sampling(x):
+    return x.toarray()
+
+
+def print_results(y_test: np.array, y_pred: np.array) -> dict:
+    metrics = [np.round(accuracy_score(y_test, y_pred), 2),
+               np.round(precision_score(y_test, y_pred, zero_division= 0), 2),
+               np.round(recall_score(y_test, y_pred, zero_division= 0), 2),
+               np.round(f1_score(y_test, y_pred, zero_division= 0), 2)
+               ]
+
+    metrics_name = ["accuracy", "precision", "recall", "f1"]
+    metrics = dict(zip(metrics_name, metrics))
+
+    print(f"Accuracy: {metrics.get('accuracy')}",
+          f"Precision: {metrics.get('precision')}",
+          f"Recall: {metrics.get('recall')}",
+          f"F1 Score: {metrics.get('f1')}")
+
+    return metrics
+
+def baseline_model(y: np.array,
+        test_split: float=0.3
+    ) -> None:
+
+    print(Fore.MAGENTA + "\n ⭐️ Results to beat" + Style.RESET_ALL)
+    y_train, y_test = train_test_split(y, test_size=test_split, random_state=42, stratify=y)
+
+    print(Fore.BLUE + "\n Result for random baseline" + Style.RESET_ALL)
+
+    print(Fore.BLUE + "\n Result for random baseline" + Style.RESET_ALL)
+    y_baseline = np.random.randint(0, 2, size=len(y_test))
+    print_results(y_test, y_baseline)
+
+    print(Fore.BLUE + "\n Result for majority baseline" + Style.RESET_ALL)
+    y_baseline = np.zeros(len(y_test))
+    print_results(y_test, y_baseline)
 
 def build_pipeline(numeric_cols:[str], text_cols:[str], other_cols:[str], max_features:int=1000):
 
@@ -48,8 +91,9 @@ def build_pipeline(numeric_cols:[str], text_cols:[str], other_cols:[str], max_fe
             ('other', other_transformer, other_cols)
         ])
 
-    pipeline = Pipeline(steps=[('preprocessor', preprocessor),
-                               ('smote', SMOTE(random_state=42, k_neighbors=20)),
+    pipeline = Pipeline(steps=[("balancing", RandomUnderSampler(random_state=1830))
+                               ('preprocessor', preprocessor),
+                               #('smote', SMOTE(random_state=42, k_neighbors=20)),
                                ('selector', SelectKBest(chi2, k = 2000)),
                                ('clf', LogisticRegression(penalty = 'l2', C = .9,
                                 multi_class = 'multinomial', class_weight = 'balanced',
@@ -57,12 +101,6 @@ def build_pipeline(numeric_cols:[str], text_cols:[str], other_cols:[str], max_fe
                                ])
 
     return pipeline
-
-def baseline_model(X: pd.DataFrame,
-        y: np.array,
-    ):
-
-
 
 def train_model(
         X: pd.DataFrame,
@@ -76,7 +114,7 @@ def train_model(
     """
 
     numeric_cols = X.select_dtypes(include=[np.number]).columns
-    text_cols = ["text", "amenities"]
+    text_cols = ["description", "amenities"]
     other_cols = list(set(X.columns) - set(numeric_cols) - set(text_cols))
 
     pipe_model = build_pipeline(numeric_cols, text_cols, other_cols, max_features = max_features)
@@ -86,12 +124,13 @@ def train_model(
     print(Fore.BLUE + "\nLaunching CV" + Style.RESET_ALL)
 
     cv = RepeatedStratifiedKFold(n_splits=5, n_repeats=2, random_state=42)
-    res = cross_validate(pipe_model, X_train, y_train, verbose=2, cv=cv)
+    res = cross_validate(pipe_model, X_train, y_train, verbose=2, cv=cv, scoring=scoring)
     res = pd.DataFrame(res)
 
-    #breakpoint()
-    size_data = y_train.value_counts().sort_values(ascending=False).iloc[0] * 16
-    print(f"✅ Model trained on {size_data} total rows including \n {len(X_train)} original rows with mean cross_validated accuracy: {round(np.mean(res.get('test_score')), 2)}")
+    #size_data = y_train.value_counts().sort_values(ascending=False).iloc[0] * 16
+    print(f"✅ Model trained on \n {len(X_train)} original rows")
+    print(f"Mean cross_validated accuracy: {round(np.mean(res.get('test_accuracy')), 2)}")
+    print(f"Mean cross_validated precision: {round(np.mean(res.get('test_precision')), 2)}")
 
     pipe_model.fit(X_train, y_train)
 
@@ -119,6 +158,10 @@ def evaluate_model(
     metrics = [accuracy_score(y_test, y_pred) , precision_score(y_test, y_pred, average="macro"),
                f1_score(y_test, y_pred, average="macro"), recall_score(y_test, y_pred, average="macro")]
     metrics_name = ["res_accuracy", "res_precision", "res_f1", "res_recall"]
+
+    print(f"✅ Model evaluated")
+    print_results(y_test, y_pred)
+
 
     print(f"✅ Model evaluated, accuracy: {np.round(metrics[0], 2)}, precision: {np.round(metrics[1], 2)}, recall: {np.round(metrics[2], 2)}")
 
