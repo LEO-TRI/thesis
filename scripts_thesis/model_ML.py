@@ -28,12 +28,6 @@ import pickle
 
 scoring = ['accuracy', 'precision', 'recall', 'f1']
 
-def to_arr(x):
-    return x.toarray()
-
-def under_sampling(x):
-    return x.toarray()
-
 
 def print_results(y_test: np.array, y_pred: np.array) -> dict:
     metrics = [np.round(accuracy_score(y_test, y_pred), 2),
@@ -52,6 +46,7 @@ def print_results(y_test: np.array, y_pred: np.array) -> dict:
 
     return metrics
 
+
 def baseline_model(y: np.array,
         test_split: float=0.3
     ) -> None:
@@ -69,6 +64,7 @@ def baseline_model(y: np.array,
     y_baseline = np.zeros(len(y_test))
     print_results(y_test, y_baseline)
 
+
 def build_pipeline(numeric_cols:[str], text_cols:[str], other_cols:[str], max_features:int=1000):
 
     numeric_transformer = Pipeline(steps=[
@@ -81,7 +77,7 @@ def build_pipeline(numeric_cols:[str], text_cols:[str], other_cols:[str], max_fe
     ])
 
     other_transformer = Pipeline(steps=[
-        ('onehot', OneHotEncoder(drop='first', sparse_output=False, feature_name_combiner=custom_combiner))
+        ('onehot', OneHotEncoder(drop='first', sparse_output=False))#, feature_name_combiner=custom_combiner))
     ])
 
     preprocessor = ColumnTransformer(
@@ -91,7 +87,7 @@ def build_pipeline(numeric_cols:[str], text_cols:[str], other_cols:[str], max_fe
             ('other', other_transformer, other_cols)
         ])
 
-    pipeline = Pipeline(steps=[("balancing", RandomUnderSampler(random_state=1830))
+    pipeline = Pipeline(steps=[("balancing", RandomUnderSampler(random_state=1830)),
                                ('preprocessor', preprocessor),
                                #('smote', SMOTE(random_state=42, k_neighbors=20)),
                                ('selector', SelectKBest(chi2, k = 2000)),
@@ -101,6 +97,7 @@ def build_pipeline(numeric_cols:[str], text_cols:[str], other_cols:[str], max_fe
                                ])
 
     return pipeline
+
 
 def train_model(
         X: pd.DataFrame,
@@ -135,6 +132,7 @@ def train_model(
     pipe_model.fit(X_train, y_train)
 
     return pipe_model, res
+
 
 def evaluate_model(
         model,
@@ -172,8 +170,10 @@ def evaluate_model(
     results = {key: [value] for key, value in results.items()}
     return pd.DataFrame(results, index=[0]), y_pred, y_test
 
+
 def predict_model(model, X:str) -> np.array:
     return model.predict(X), model.predict_proba(X)
+
 
 def load_model(model_name:str = None):
     if model_name==None:

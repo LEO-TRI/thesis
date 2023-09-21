@@ -117,51 +117,57 @@ class GraphLoader:
 ###Methods for predictive parts####
 
 ###Cleaning raw data###
-def load_folder(path: str) -> [pd.DataFrame]:
-    files = glob.glob(path + '/*.csv.gz')
-    for f in files:
-            # get filename
-            stock = os.path.basename(f)
-            if len(re.findall("listing", stock))>0:
-                temp_df = pd.read_csv(f)
-                # create new column with filename
-                temp_df['ticker'] = stock
-                temp_df['ticker'] = temp_df['ticker'].replace('.csv.gz', '', regex=True)
-                temp_df['ticker'] = temp_df['ticker'].replace('listings_', '', regex=True)
-                yield temp_df
+class DataLoader:
 
-def load_raw_data() -> pd.DataFrame:
-    if len(os.listdir(LOCAL_RAW_PATH))>0:
-        li = [df for df in load_folder(LOCAL_RAW_PATH)]
+    def __init__(self, path: str = LOCAL_RAW_PATH):
+        self.path = path
 
-    else:
-        full_file_path = os.path.join(os.getcwd(), "data")
-        li = [df for df in load_folder(full_file_path)]
+    def load_folder(self) -> [pd.DataFrame]:
+        files = glob.glob(self.path + '/*.csv.gz')
+        for f in files:
+                # get filename
+                stock = os.path.basename(f)
+                if len(re.findall("listing", stock))>0:
+                    temp_df = pd.read_csv(f)
+                    # create new column with filename
+                    temp_df['ticker'] = stock
+                    temp_df['ticker'] = temp_df['ticker'].replace('.csv.gz', '', regex=True)
+                    temp_df['ticker'] = temp_df['ticker'].replace('listings_', '', regex=True)
+                    yield temp_df
 
-    return pd.concat(li)
+    def load_raw_data(self) -> pd.DataFrame:
+        if len(os.listdir())>0:
+            li = [df for df in self.load_folder()]
 
-#Building target#
-def load_processed_data(file_name:str= None) -> pd.DataFrame:
+        else:
+            full_file_path = os.path.join(os.getcwd(), "data")
+            li = [df for df in self.load_folder(full_file_path)]
 
-    if file_name==None:
-        full_file_path = os.path.join(LOCAL_DATA_PATH, "None")
-    else:
-        full_file_path = os.path.join(LOCAL_DATA_PATH, file_name)
+        return pd.concat(li)
 
-    if not os.path.exists(full_file_path):
-        files = [os.path.join(LOCAL_DATA_PATH, file) for file in os.listdir(LOCAL_DATA_PATH) if file.endswith(".parquet.gzip")]
+    #Building target#
+    @staticmethod
+    def load_processed_data(file_name:str= None) -> pd.DataFrame:
 
-        if len(files) == 0:
-            print("No processed data, please use preprocess first")
+        if file_name==None:
+            full_file_path = os.path.join(LOCAL_DATA_PATH, "None")
+        else:
+            full_file_path = os.path.join(LOCAL_DATA_PATH, file_name)
+
+        if not os.path.exists(full_file_path):
+            files = [os.path.join(LOCAL_DATA_PATH, file) for file in os.listdir(LOCAL_DATA_PATH) if file.endswith(".parquet.gzip")]
+
+            if len(files) == 0:
+                print("No processed data, please use preprocess first")
+                return None
+
+            print("No corresponding parquet file, returning latest saved parquet")
+            full_file_path = max(files, key=os.path.getctime)
+
+        data_processed = pd.read_parquet(full_file_path)
+
+        if data_processed.shape[0] < 10:
+            print("❌ Not enough processed data retrieved to train on")
             return None
 
-        print("No corresponding parquet file, returning latest saved parquet")
-        full_file_path = max(files, key=os.path.getctime)
-
-    data_processed = pd.read_parquet(full_file_path)
-
-    if data_processed.shape[0] < 10:
-        print("❌ Not enough processed data retrieved to train on")
-        return None
-
-    return data_processed
+        return data_processed
