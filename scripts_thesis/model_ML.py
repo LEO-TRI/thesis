@@ -6,7 +6,7 @@ from sklearn.model_selection import train_test_split, cross_validate, RepeatedSt
 from sklearn.metrics import accuracy_score, precision_score, f1_score, recall_score, classification_report
 from sklearn.linear_model import LogisticRegression, SGDClassifier
 from sklearn.feature_selection import SelectKBest, chi2
-from sklearn.preprocessing import RobustScaler, OneHotEncoder, FunctionTransformer
+from sklearn.preprocessing import RobustScaler, OneHotEncoder
 from sklearn.compose import ColumnTransformer
 
 import pandas as pd
@@ -63,9 +63,7 @@ def print_results(y_test: np.array, y_pred: np.array) -> dict:
     return metrics
 
 
-def baseline_model(y: np.array,
-        test_split: float=0.3
-    ) -> np.array:
+def baseline_model(y: np.array, test_split: float=0.3) -> np.array:
     """
     Function computing the baseline to beat by the new model. 
     Produces two baseline, one coming from a random guess and the other from predicting only the majority class
@@ -153,12 +151,7 @@ def build_pipeline(numeric_cols:[str], text_cols:[str], other_cols:[str], max_fe
     return pipeline
 
 
-def train_model(
-        X: pd.DataFrame,
-        y: np.array,
-        test_split: float=0.3,
-        max_features: int=1000
-    ) -> Pipeline:
+def train_model(X: pd.DataFrame, y: np.array, test_split: float=0.3, max_features: int=1000) -> Pipeline:
     """ 
     Fit the passed model with the passed data and return a tuple (fitted_model, history)
 
@@ -205,18 +198,13 @@ def train_model(
     return pipe_model, res
 
 
-def evaluate_model(
-        model,
-        X: pd.DataFrame,
-        y: pd.Series,
-        test_split:float=0.3
-    ) -> pd.DataFrame:
+def evaluate_model(model, X: pd.DataFrame, y: pd.Series, test_split:float=0.3) -> pd.DataFrame:
     """
     Evaluate trained model performance on the dataset
 
     Parameters
     ----------
-    model : _type_
+    model : object
         A sklearn model, instantiated from a pickle file or trained before. 
     X : pd.DataFrame
         The dataframe of features
@@ -263,36 +251,37 @@ def evaluate_model(
     return pd.DataFrame(results, index=[0]), y_pred, y_test
 
 
-def predict_model(model, X: str) -> np.array:
-    """_summary_
+def predict_model(model, X: pd.DataFrame) -> np.array:
+    """Function to predict using a trained model
 
     Parameters
     ----------
-    model : _type_
-        _description_
-    X : str
-        _description_
+    model : object
+        A trained sklearn model
+    X : pd.DataFrame
+        Data passed in the model to obtained predictions
 
     Returns
     -------
     np.array
-        _description_
+        An array of 0 and 1, depending on predictions
     """
     return model.predict(X), model.predict_proba(X)
 
 
 def load_model(model_name: str = None) -> None:
-    """_summary_
+    """
+    Convenience function to load a pickled model
 
     Parameters
     ----------
     model_name : str, optional
-        _description_, by default None
+        the name of a trained model, if None, returns the latest saved, by default None
 
     Returns
     -------
-    _type_
-        _description_
+    model : object
+        The loaded sklearn model
     """
     if model_name==None:
         full_file_path = os.path.join(LOCAL_MODEL_PATH, "None")

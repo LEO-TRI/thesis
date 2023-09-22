@@ -21,7 +21,7 @@ class SpacyClean:
         self.nlp_fr = spacy.load(('fr_core_news_sm'))
         self.nlp_fr.remove_pipe('ner')
 
-    def preprocess_spacy(self, alpha: "array_like") -> np.array:
+    def preprocess_spacy(self, alpha: np.array) -> np.array:
         """
         Function using Spacy to lemmatize the text. Discriminates between french and english text.
         Returns the lemmatized version of words when those words are NOUN, VERB and ADJ.

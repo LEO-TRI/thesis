@@ -23,7 +23,8 @@ def update_prop(handle, orig):
 
 
 def table_color(data:pd.Series, palette_min: int=145, palette_up: int=300, n: int=5) -> list:
-    """Convenience function to convert a numerical sequence into a color sequence based on its quantiles
+    """
+    Convenience function to convert a numerical sequence into a color sequence based on its quantiles
 
     Parameters
     ----------
@@ -59,10 +60,15 @@ def line_adder(h_coord=0.5, color="black", linestyle="-", *args):
 
 
 def custom_combiner(feature, category):
+    """
+    A convenience function that can be used in sklearn's ohe to format column names.
+    Requires sklearn version >= 1.3.0
+
+    """
     return str(category)
 
 
-def get_top_features(model, has_selector: bool = True, top_n: int = 25, how: str = 'long') -> pd.DataFrame:
+def get_top_features(model, has_selector: bool= True, top_n: int= 25, how: str= 'long') -> pd.DataFrame:
     """
     Convenience function to extract top_n predictor per class from a model.
 
@@ -138,8 +144,9 @@ def get_top_features(model, has_selector: bool = True, top_n: int = 25, how: str
     return df_lambda
 
 
-def plot_confusion_matrix(y_true: np.array, y_pred: np.array, width=400, height=400) -> px.imshow:
-    """_summary_
+def plot_confusion_matrix(y_true: np.array, y_pred: np.array, width= 400, height= 400) -> px.imshow:
+    """
+    Convenience function to print a confusion matrix with the predicted results y_pred
 
     Parameters
     ----------
@@ -198,7 +205,8 @@ def plot_confusion_matrix(y_true: np.array, y_pred: np.array, width=400, height=
 
 
 def model_explainer(df: pd.DataFrame, x: str= "coef", y: str= "feature")-> px.bar:
-    """A function that takes the dataframe outputed by get_top_features() and creates a barplot of most important features using Plotly
+    """
+    A function that takes the dataframe outputed by get_top_features() and creates a barplot of most important features using Plotly
 
     Parameters
     ----------

@@ -152,6 +152,19 @@ class DataLoader:
     #Building target#
     @staticmethod
     def load_processed_data(file_name: str= None) -> pd.DataFrame:
+        """
+        A convenience function to load the processed data
+
+        Parameters
+        ----------
+        file_name : str, optional
+            The file to be loaded, if None returns the latest saved, by default None
+
+        Returns
+        -------
+        pd.DataFrame
+            The loaded DataFrame
+        """
 
         if file_name==None:
             full_file_path = os.path.join(LOCAL_DATA_PATH, "None")
@@ -177,5 +190,9 @@ class DataLoader:
         return data_processed
 
 class LoadDataMixin():
+    """
+    A test class to check how mixins work
+    Is supposed to allow the ModelFlow class in main.py to inherit a method from DataLoader
+    """
     def load_raw_data(self):
         return super().load_raw_data()
