@@ -47,7 +47,6 @@ class ModelFlow(LoadDataMixin, DataLoader):
 
     def __init__(self) -> None:
         super().__init__() #Brings back load_raw_data. Used as a test for mixin
-        self.pred_data = self.preprocess() #Used to keep some prediction data unseen by the model
 
 
     def preprocess(self, model: bool=True) -> pd.DataFrame:
@@ -65,8 +64,10 @@ class ModelFlow(LoadDataMixin, DataLoader):
 
         Returns
         -------
-        data_clean_pred : pd.DataFrame
+        data_clean_train : pd.DataFrame
             A cleaned df saved locally and that can be used for training and testing afterwards. 
+        data_clean_pred: pd.DataFrame
+            A cleaned df saved in the class and that is used for predicted afterwards
         """
         print(Fore.MAGENTA + "\n ⭐️ Use case: preprocess" + Style.RESET_ALL)
 
@@ -115,12 +116,9 @@ class ModelFlow(LoadDataMixin, DataLoader):
         print(Fore.MAGENTA + "\n⭐️ Use case: train" + Style.RESET_ALL)
         print(Fore.BLUE + "\nLoading preprocessed validation data..." + Style.RESET_ALL)
 
-        data_processed = DataLoader.load_processed_data(file_name=file_name)
-        if data_processed is None: #Used to exit the function and trigger an error if load_processed_data fails
+        X, y = DataLoader.prep_data(file_name=file_name)
+        if X is None: #Used to exit the function and trigger an error if load_processed_data fails
             return None
-
-        y= data_processed[target].astype(int)
-        X = data_processed.drop(columns=[target])
 
         print(Fore.BLUE + "\nTraining model..." + Style.RESET_ALL)
         model, res = train_model(X, y, test_split)
@@ -134,6 +132,72 @@ class ModelFlow(LoadDataMixin, DataLoader):
         full_file_path = os.path.join(LOCAL_RESULT_PATH, file_name)
         res.to_csv(full_file_path)
 
+    def evaluate(file_name: str = None, target: str = "license") -> pd.DataFrame:
+        """
+        Evaluate the performance of the latest production model on processed data.\n
+        Return accuracy, recall, precision and f1 as a pd.DataFrame.
+        """
+        print(Fore.MAGENTA + "\n⭐️ Use case: evaluate" + Style.RESET_ALL)
+
+        data_processed = DataLoader.load_processed_data(file_name=file_name)
+        if data_processed is None:
+            return None
+
+        y= data_processed[target]
+        X = data_processed.drop(columns=[target])
+
+        model = load_model()
+        results, y_pred, y_test = evaluate_model(model, X, y)
+
+        plot_confusion_matrix(y_test, y_pred)
+
+        model_iteration = len(os.listdir(LOCAL_EVALUATE_PATH)) + 1
+        file_name = f'model_evaluate_V{model_iteration}'
+
+        full_file_path = os.path.join(LOCAL_EVALUATE_PATH, file_name)
+        results.to_csv(full_file_path)
+
+        print("✅ evaluate() done \n")
+
+        return results
+
+    def pred(self, X_pred:pd.DataFrame = None) -> np.array:
+        """
+        Make a prediction using the latest trained model and provided data.
+
+        Parameters
+        ----------
+        X_pred : pd.DataFrame, optional
+            The dataframe with the rows to predict, by default None
+            If none, some built-in examples will be used. 
+
+        Returns
+        -------
+        y_pred : np.array
+            An array of predicted values based on X_pred
+        """
+        if X_pred is None:
+            X_pred = self.pred_data #10 rows of the original data removed during preprocessing and never seen by the model
+            
+        print("\n⭐️ Use case: predict")
+
+        model = load_model()
+        assert model is not None
+
+        X_pred = X_pred.drop(columns=["license"])
+        if len(X_pred) == 0:
+            print("Error on the input X_pred, please review your input")
+            return None
+
+        y_pred, y_pred_proba = predict_model(model, X_pred)
+
+
+        print("\n✅ prediction done: ", y_pred, y_pred.shape, "\n")
+        print("\n✅ Proba: ", y_pred_proba, "\n")
+
+        return y_pred
+    
+    @staticmethod
     def model_viz()-> None:
         '''
         Method that produces a graph showing main words used to predict SDG categories.\n
@@ -158,90 +222,20 @@ class ModelFlow(LoadDataMixin, DataLoader):
         full_file_path = os.path.join(LOCAL_IMAGE_PATH, file_name)
         fig.write_image(full_file_path)
 
-    def evaluate(file_name:str = None,
-        target:str = "sdg"
-        ) -> pd.DataFrame:
-        """
-        Evaluate the performance of the latest production model on processed data.\n
-        Return accuracy, recall, precision and f1 as a pd.DataFrame.
-        """
-        print(Fore.MAGENTA + "\n⭐️ Use case: evaluate" + Style.RESET_ALL)
-
-        data_processed = DataLoader.load_processed_data(file_name=file_name)
-        if data_processed is None:
-            return None
-
-        y= data_processed[target]
-        X = data_processed["lemma"]
-
-        model = load_model()
-        results, y_pred, y_test = evaluate_model(model, X, y)
-
-        plot_confusion_matrix(y_test, y_pred)
-
-        model_iteration = len(os.listdir(LOCAL_EVALUATE_PATH)) + 1
-        file_name = f'model_evaluate_V{model_iteration}'
-
-        full_file_path = os.path.join(LOCAL_EVALUATE_PATH, file_name)
-        results.to_csv(full_file_path)
-
-        print("✅ evaluate() done \n")
-
-        return results
-
-    def pred(X_pred:pd.DataFrame = None) -> np.array:
-        """
-        Make a prediction using the latest trained model and provided data.
-
-        Parameters
-        ----------
-        X_pred : pd.DataFrame, optional
-            The dataframe with the rows to predict, by default None
-            If none, some built-in examples will be used. 
-
-        Returns
-        -------
-        y_pred : np.array
-            An array of predicted values based on X_pred
-        """
-        if X_pred is None:
-            X_pred = np.array(
-                ["The UN debated a new plan to increase poverty-relief efforts in poor and emerging countries",
-                "Results of the conference on the protection of biodiversity have stalled, with measures for large mammals especially problematic"
-                ]
-                    )
-            
-        print("\n⭐️ Use case: predict")
-
-        model = load_model()
-        assert model is not None
-
-        X_pred = X_pred.drop(columns=column_selector(X_pred))
-        X_pred = clean_variables_features(X_pred)
-        if len(X_pred) == 0:
-            print("Error on the input X_pred, please review your input")
-            return None
-
-        y_pred, y_pred_proba = predict_model(model, X_pred)
-
-
-        print("\n✅ prediction done: ", y_pred, y_pred.shape, "\n")
-        print("\n✅ Proba: ", y_pred_proba, "\n")
-
-        return y_pred
-
 
 if __name__ == '__main__':
     #agreement, target = main()
     local_setup()
     print("✅ Setup done")
-    preprocess()
+
+    ml = ModelFlow()
+    ml.pred_data = ml.preprocess() #Used to keep some prediction data unseen by the model
     print("✅ Process done")
-    #train(target=target)
+    ml.train()
     print("✅ Train done")
-    #model_viz()
+    ModelFlow.model_viz()
     print("✅ Viz created")
-    #evaluate(target=target)
+    ml.evaluate()
     print("✅ Evaluate done")
     #pred()
     print("✅ Pred done")

@@ -127,6 +127,19 @@ class DataLoader:
         self.path = path
 
     def load_folder(self) -> [pd.DataFrame]:
+        """
+        A function to faciliate iterations over all available csvs in a given folder 
+
+        Returns
+        -------
+        [pd.DataFrame]
+            AA list of pd.DataFrame
+
+        Yields
+        ------
+        Iterator[[pd.DataFrame]]
+            One instance of the processed dataframe. Yields 1 by iteration over the list of csv files
+        """
         files = glob.glob(self.path + '/*.csv.gz')
         for f in files:
                 # get filename
@@ -140,6 +153,16 @@ class DataLoader:
                     yield temp_df
 
     def load_raw_data(self) -> pd.DataFrame:
+        """
+        A function to convert the list of dataframe yielded by load_folder()
+
+        Leverages load_folder() and its yield structure to concatenate [pd.DataFrame] into 1 pd.DataFrame
+
+        Returns
+        -------
+        pd.DataFrame
+            The full pd.DataFrame of raw data
+        """
         if len(os.listdir())>0:
             li = [df for df in self.load_folder()]
 
@@ -162,7 +185,7 @@ class DataLoader:
 
         Returns
         -------
-        pd.DataFrame
+        data_processed : pd.DataFrame
             The loaded DataFrame
         """
 
@@ -188,6 +211,34 @@ class DataLoader:
             return None #Used to exit the function
 
         return data_processed
+    
+    def prep_data(self, file_name: str=None, target: str = "license") -> tuple[pd.DataFrame, pd.Series]:
+        """
+        A convenience function leveraging load_processed_data in the same class to provide additional processing. 
+        
+        Exists to avoid cluttering main.py
+
+        Parameters
+        ----------
+        file_name : str, optional
+            the path of the file with the data, if None, will default to the latest file, by default None
+        target : str, optional
+            The target feature to be defined as y, by default "license"
+
+        Returns
+        -------
+        tuple[pd.DataFrame, pd.Series]
+            A tuple containing the pd.DataFrame X of features and the pd.Series y of the target 
+        """
+        df = self.load_processed_data(file_name=file_name)
+        if df is None: #Used to exit the function and trigger an error if load_processed_data fails
+            return None, None
+
+        y= df[target].astype(int)
+        X = df.drop(columns=[target])
+
+        return X, y
+
 
 class LoadDataMixin():
     """

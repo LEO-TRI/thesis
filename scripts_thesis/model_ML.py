@@ -28,7 +28,7 @@ import pickle
 scoring = ['accuracy', 'precision', 'recall', 'f1']
 
 
-def print_results(y_test: np.array, y_pred: np.array) -> dict:
+def print_results(y_test: np.ndarray, y_pred: np.ndarray) -> dict:
     """
     Convenience function used to quickly compute and display the evaluation metrics of a model. 
     Can be used after getting y_pred from a trained model. 
@@ -36,9 +36,9 @@ def print_results(y_test: np.array, y_pred: np.array) -> dict:
 
     Parameters
     ----------
-    y_test : np.array
+    y_test : np.ndarray
         Array of the real values 
-    y_pred : np.array
+    y_pred : np.ndarray
         Array of the predicted values
 
     Returns
@@ -63,21 +63,21 @@ def print_results(y_test: np.array, y_pred: np.array) -> dict:
     return metrics
 
 
-def baseline_model(y: np.array, test_split: float=0.3) -> np.array:
+def baseline_model(y: np.ndarray, test_split: float=0.3) -> np.ndarray:
     """
     Function computing the baseline to beat by the new model. 
     Produces two baseline, one coming from a random guess and the other from predicting only the majority class
 
     Parameters
     ----------
-    y : np.array/array_like
+    y : np.ndarray/array_like
         The target feature
     test_split : float, optional
         The split ratio between train and test, by default 0.3
 
     Returns
     -------
-    np.array
+    np.ndarray
         Array of predicted results. 
     """
 
@@ -151,7 +151,7 @@ def build_pipeline(numeric_cols:[str], text_cols:[str], other_cols:[str], max_fe
     return pipeline
 
 
-def train_model(X: pd.DataFrame, y: np.array, test_split: float=0.3, max_features: int=1000) -> Pipeline:
+def train_model(X: pd.DataFrame, y: np.ndarray, test_split: float=0.3, max_features: int=1000) -> Pipeline:
     """ 
     Fit the passed model with the passed data and return a tuple (fitted_model, history)
 
@@ -159,7 +159,7 @@ def train_model(X: pd.DataFrame, y: np.array, test_split: float=0.3, max_feature
     ----------
     X : pd.DataFrame
         The dataframe of features
-    y : pd.Series
+    y : np.ndarray
         The target variable
     test_split : float, optional
         _description_, by default 0.3
@@ -208,7 +208,7 @@ def evaluate_model(model, X: pd.DataFrame, y: pd.Series, test_split:float=0.3) -
         A sklearn model, instantiated from a pickle file or trained before. 
     X : pd.DataFrame
         The dataframe of features
-    y : pd.Series
+    y : pd.Series/np.ndarray
         The target variable
     test_split : float, optional
         The split ratio between train and test, by default 0.3
@@ -217,9 +217,9 @@ def evaluate_model(model, X: pd.DataFrame, y: pd.Series, test_split:float=0.3) -
     -------
     pd.DataFrame
         A dataframe with the evaluated metrics (4 metrics)
-    y_pred: np.array
+    y_pred: np.ndarray
         A np.array of the model's prediction
-    y_test: np.array
+    y_test: np.ndarray
         A np.array of the real data
     """
     
@@ -251,7 +251,7 @@ def evaluate_model(model, X: pd.DataFrame, y: pd.Series, test_split:float=0.3) -
     return pd.DataFrame(results, index=[0]), y_pred, y_test
 
 
-def predict_model(model, X: pd.DataFrame) -> np.array:
+def predict_model(model, X: pd.DataFrame) -> np.ndarray:
     """Function to predict using a trained model
 
     Parameters
@@ -263,7 +263,7 @@ def predict_model(model, X: pd.DataFrame) -> np.array:
 
     Returns
     -------
-    np.array
+    np.ndarray
         An array of 0 and 1, depending on predictions
     """
     return model.predict(X), model.predict_proba(X)
@@ -276,7 +276,7 @@ def load_model(model_name: str = None) -> None:
     Parameters
     ----------
     model_name : str, optional
-        the name of a trained model, if None, returns the latest saved, by default None
+        the name of a trained model, if None, returns the latest saved model, by default None
 
     Returns
     -------
