@@ -5,26 +5,51 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import seaborn as sns
 
-from sklearn.metrics import accuracy_score, f1_score, confusion_matrix, precision_score
+from sklearn.metrics import accuracy_score, f1_score, confusion_matrix, precision_score, RocCurveDisplay, auc
 
 import plotly.express as px
 import plotly.graph_objects as go
 
-def date_range(min_date, date, max_date):
+hex_colors = [mcolors.to_hex(color) for color in sns.diverging_palette(145, 300, s=60, n=5)]
+hex_colors.reverse()
+
+def date_range(min_date, date, max_date) -> [bool]:
     return (min_date <= date <= max_date)
+
+
 date_range_vec = np.vectorize(date_range)
+
 
 def update_prop(handle, orig):
     handle.update_from(orig)
     x,y = handle.get_data()
     handle.set_data([np.mean(x)]*2, [0, 2*y[0]])
 
-def table_color(data:pd.Series, palette_min=145, palette_up=300, n=5):
 
+def table_color(data:pd.Series, palette_min: int=145, palette_up: int=300, n: int=5) -> list:
+    """
+    Convenience function to convert a numerical sequence into a color sequence based on its quantiles
+
+    Parameters
+    ----------
+    data : pd.Series
+        numerical data on which to build the color scale
+    palette_min : int, optional
+        minimum for the palette spectrum, by default 145
+    palette_up : int, optional
+        maxmimum for the palette spectrum, by default 300
+    n : int, optional
+        Number of discrete colors to have in the palette, by default 5
+
+    Returns
+    -------
+    list
+        Returns a list of the size of data and with each element being a color hexacode 
+    """
     hex_colors = [mcolors.to_hex(color) for color in sns.diverging_palette(palette_min, palette_up, s=60, n=n)]
     hex_colors.reverse()
 
-    bins = np.quantile(data.values, np.arange(0, 1.1, 0.2))
+    bins = np.quantile(data.values, np.linspace(0, 1, num=n))
     vals = data.values
 
     cell_color = [hex_colors[0] if val <= bins[0] else hex_colors[1] if bins[0] < val < bins[1] else hex_colors[2] if bins[1] < val < bins[2] \
@@ -32,26 +57,73 @@ def table_color(data:pd.Series, palette_min=145, palette_up=300, n=5):
 
     return cell_color
 
+
 def line_adder(h_coord=0.5, color="black", linestyle="-", *args):
-    line = plt.Line2D([0.15,0.85], [h_coord, h_coord], transform=args.transFigure, color="black", linestyle="-")
+    line = plt.Line2D([0.15,0.85], [h_coord, h_coord], transform=args.transFigure, color=color, linestyle=linestyle)
     return args.add_artist(line)
 
+
 def custom_combiner(feature, category):
+    """
+    A convenience function that can be used in sklearn's ohe to format column names.
+    Requires sklearn version >= 1.3.0
+
+    """
     return str(category)
 
-def get_top_features(vectoriser, clf, selector = None, top_n: int = 25, how: str = 'long'):
+def get_top_features(model, has_selector: bool= True, top_n: int= 25, how: str= 'long') -> pd.DataFrame:
     """
     Convenience function to extract top_n predictor per class from a model.
+
+    Parameters
+    ----------
+    model : imblearn.pipeline.Pipeline or sklearn.pipeline.Pipeline
+        The model must have 4 elements: 
+
+            vectoriser : sklearn.feature_extraction.text.TfidfVectorizer
+                The sklearn vectoriser used to transform strings into words
+
+            clf : sklearn.linear_model.LogisticRegression
+                The sklearn predictor used to classify the data 
+
+            ohe: sklearn.preprocessing.OneHotEncoder      
+                The sklearn preprocessor for categorical data
+
+            selector : sklearn.feature_selection.SelectKBest, optional
+                The sklearn selector used to reduce the number of features, by default None
+
+    top_n : int, optional
+        Number of top features to return, by default 25
+    how : str, optional
+        Shape of the output, by default 'long'
+
+    Returns
+    -------
+    pd.DataFrame
+        Output dataframe with rows being each one of the top_n most important coef with its respective value 
     """
 
+    vectoriser = model["preprocessor"].get_params().get("transformers")[1][1]
+    ohe = model["preprocessor"].get_params().get("transformers")[2][1]
+    clf = model["clf"]
+
     assert hasattr(vectoriser, 'get_feature_names_out')
+    assert hasattr(ohe, 'get_feature_names_out')
     assert hasattr(clf, 'coef_')
-    assert hasattr(selector, 'get_support')
     assert how in {'long', 'wide'}, f'how must be either long or wide not {how}'
 
-    features = vectoriser.get_feature_names_out()
-    if selector is not None:
+    if has_selector:
+        selector = model["selector"]
+        assert hasattr(selector, 'get_support')
+
+    num_cols = model["preprocessor"].get_params().get("transformers")[0][2]
+    text_cols = vectoriser.get_feature_names_out()
+    ohe_cols = ohe.get_feature_names_out()
+    features = np.concatenate([num_cols, text_cols, ohe_cols])
+
+    if has_selector:
         features = features[selector.get_support()]
+        
     axis_names = [f'feature_{x + 1}' for x in range(top_n)]
 
     if len(clf.classes_) > 2:
@@ -64,7 +136,8 @@ def get_top_features(vectoriser, clf, selector = None, top_n: int = 25, how: str
         idx = coefs.argsort()[::-1][:top_n]
         results = tuple(zip([clf.classes_[1]] * top_n, features[idx], coefs[idx]))
 
-    df_lambda = pd.DataFrame(results, columns =  ['SDG', 'feature', 'coef'])
+
+    df_lambda = pd.DataFrame(results, columns =  ['Class', 'feature', 'coef'])
 
     if how == 'wide':
         df_lambda = pd.DataFrame(
@@ -73,42 +146,28 @@ def get_top_features(vectoriser, clf, selector = None, top_n: int = 25, how: str
             columns = axis_names
         )
 
-    #df_lambda["SDG"] = df_lambda["SDG"].astype(str)
-    #df_lambda["SDG"] = df_lambda["SDG"].map(DataProcess().sdg)
-
     return df_lambda
 
-def sdg_explainer(df: pd.DataFrame)-> px.bar:
-    colors = px.colors.qualitative.Dark24[:20]
-    template = 'SDG: %{customdata}<br>Feature: %{y}<br>Coefficient: %{x:.2f}'
-
-    fig = px.bar(
-        data_frame = df,
-        x = 'coef',
-        y = 'feature',
-        custom_data = ['SDG'],
-        facet_col = 'SDG',
-        facet_col_wrap = 3,
-        facet_col_spacing = .15,
-        height = 1200,
-        labels = {
-            'coef': 'Coefficient',
-            'feature': ''
-        },
-        title = 'Top 15 Strongest Predictors by SDG'
-    )
-
-    fig.for_each_trace(lambda x: x.update(hovertemplate = template))
-    fig.for_each_trace(lambda x: x.update(marker_color = colors.pop(0)))
-    #fig.for_each_annotation(lambda x: x.update(text = fix_sdg_name(x.text.split("=")[-1])))
-    fig.update_yaxes(matches = None, showticklabels = True)
-    fig.show()
-
-    return fig
-
-def plot_confusion_matrix(y_true: np.ndarray, y_pred: np.ndarray, width:int=400, height:int=400) -> go.Figure:
+  
+def plot_confusion_matrix(y_true: np.array, y_pred: np.array, width= 400, height= 400) -> px.imshow:
     """
-    Convenience function to display a confusion matrix in a graph.
+    Convenience function to print a confusion matrix with the predicted results y_pred
+
+    Parameters
+    ----------
+    y_true : np.array
+        Array of real data 
+    y_pred : np.array
+        Array of predicted data
+    width : int, optional
+        dimension of the image, by default 400
+    height : int, optional
+        dimension of the image, by default 400
+
+    Returns
+    -------
+    px.imshow
+        A confusion matrix of the model's result 
     """
     labels = sorted(list(set(y_true)))
     df_lambda = pd.DataFrame(
@@ -147,14 +206,150 @@ def plot_confusion_matrix(y_true: np.ndarray, y_pred: np.ndarray, width:int=400,
 
     fig.show()
 
-    import plotly.graph_objects as go
+    return fig
 
-    #fig = go.Figure(data=go.Heatmap(
-    #                z=[row for ind, row in df_lambda.iterrows()],
-    #                x=df_lambda.columns,
-    #                y=df_lambda.index,
-    #                hovertemplate = 'Price: %{y:$.2f}<extra></extra>',
-    #                hoverongaps = False))
-    #fig.show()
+
+def model_explainer(df: pd.DataFrame, x: str= "coef", y: str= "feature")-> px.bar:
+    """
+    A function that takes the dataframe outputed by get_top_features() and creates a barplot of most important features using Plotly
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        a dataframe with a categorical column (feature) and a numerical column (coef)
+    x : str, optional
+        column for the x-axis of the graph, by default "coef"
+    y : str, optional
+        column for the y-axis of the graph, by default "feature"
+
+    Returns
+    -------
+    px.bar
+        A bar graph showing the most important coeficients and their values
+    """
+
+    colors = px.colors.qualitative.Dark24[:20]
+    template = 'SDG: %{customdata}<br>Feature: %{y}<br>Coefficient: %{x:.2f}'
+
+    fig = px.bar(
+        data_frame = df,
+        x = x,
+        y = y,
+        facet_col_wrap = 3,
+        facet_col_spacing = .15,
+        height = 1200,
+        labels = {
+            'coef': 'Coefficient',
+            'feature': ''
+        },
+        title = f'Top {len(df)} Strongest Predictors by SDG'
+    )
+
+    fig.for_each_trace(lambda x: x.update(hovertemplate = template))
+    fig.for_each_trace(lambda x: x.update(marker_color = colors.pop(0)))
+    fig.update_yaxes(matches = None, showticklabels = True)
+    fig.show()
 
     return fig
+
+
+def model_dl_examiner(train: np.ndarray, val: np.ndarray) -> go.Figure:
+    """
+    A convenience function to produce the train and val loss for a trained TF model 
+
+    Parameters
+    ----------
+    train : np.ndarray
+        The history of train losses
+    val : np.ndarray
+        The history of val losses
+
+    Returns
+    -------
+    go.Figure
+        A plotly line chart
+    """
+
+    assert len(train) == len(val)
+
+    x = np.arange(len(train))
+
+    fig = go.Figure()
+
+    for color, name, line in zip([hex_colors[0], hex_colors[-1]], ["Train results", "Val results"], [train, val]):
+        fig.add_trace(
+            go.Scatter(x=x, y=line, mode='lines', name=name, marker_color = color)
+            )
+    
+    fig.update_layout(
+        xaxis=dict(title='Epochs'),
+        yaxis=dict(title='Loss: Binary cross-entropy'),
+        title="Train and val losses across epochs", 
+        legend=dict(
+        orientation="v",
+        yanchor="bottom",
+        y=0.8,
+        xanchor="right",
+        bgcolor="LightSteelBlue",
+        x=0.98)
+        )
+
+    fig.show()
+
+
+def auc_cross_val(pred: list, test_list: list):
+
+    fig, ax = plt.subplots(figsize=(6, 6))
+
+    for fold, (y_test, y_pred) in enumerate(zip(test_list, pred)):
+    
+        viz = RocCurveDisplay.from_predictions(
+            y_test,
+            y_pred, 
+            name=f"ROC fold {fold}",
+            alpha=0.3,
+            lw=1,
+            ax=ax,
+            plot_chance_level=(fold == n_splits - 1),
+        )
+        interp_tpr = np.interp(mean_fpr, viz.fpr, viz.tpr)
+        interp_tpr[0] = 0.0
+        tprs.append(interp_tpr)
+        aucs.append(viz.roc_auc)
+
+    
+    mean_tpr = np.mean(tprs, axis=0)
+    mean_tpr[-1] = 1.0
+    mean_auc = auc(mean_fpr, mean_tpr)
+    std_auc = np.std(aucs)
+    ax.plot(
+        mean_fpr,
+        mean_tpr,
+        color="b",
+        label=r"Mean ROC (AUC = %0.2f $\pm$ %0.2f)" % (mean_auc, std_auc),
+        lw=2,
+        alpha=0.8,
+    )
+
+    std_tpr = np.std(tprs, axis=0)
+    tprs_upper = np.minimum(mean_tpr + std_tpr, 1)
+    tprs_lower = np.maximum(mean_tpr - std_tpr, 0)
+    ax.fill_between(
+        mean_fpr,
+        tprs_lower,
+        tprs_upper,
+        color="grey",
+        alpha=0.2,
+        label=r"$\pm$ 1 std. dev.",
+    )
+
+    ax.set(
+        xlim=[-0.05, 1.05],
+        ylim=[-0.05, 1.05],
+        xlabel="False Positive Rate",
+        ylabel="True Positive Rate",
+        title=f"Mean ROC curve with variability\n(Positive label '{target_names[1]}')",
+    )
+    ax.axis("square")
+    ax.legend(loc="lower right")
+    plt.show()

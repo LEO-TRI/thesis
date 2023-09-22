@@ -10,13 +10,17 @@ from scripts_thesis.params import *
 ###Methods for descriptive part####
 
 class GraphLoader:
+    """
+    Convenience class used to load the dataset used for graph representation at different 
+    levels of processing.
+    """
 
-    def get_geodata(self):
+    def get_geodata(self) -> pd.DataFrame:
         tmp_ = gpd.read_file(os.path.join("data", 'quartier_paris.geojson'))
         tmp_["c_quinsee"] = pd.to_numeric(tmp_["c_quinsee"])
         return tmp_
 
-    def get_data(self, graph=True):
+    def get_data(self, graph: bool=True) -> pd.DataFrame:
         """
         This function returns a Python dict.
         Its keys should be 'sellers', 'orders', 'order_items' etc...
@@ -40,7 +44,7 @@ class GraphLoader:
 
         return df_graph
 
-    def clean_data(self, graph:bool=True):
+    def clean_data(self, graph: bool=True) -> pd.DataFrame:
         df_graph = self.get_data(graph=graph)
         df_graph["arr"] = df_graph["c_quinsee"].map(lambda row: str(row)[2:4])
 
@@ -49,7 +53,7 @@ class GraphLoader:
 
         return df_graph.loc[mask,:].reset_index(drop=True)
 
-    def get_occupancy_rate(self):
+    def get_occupancy_rate(self) -> pd.DataFrame:
         df_time = self.clean_data()
 
         df_time.loc[:, ["first_review", "last_review"]] = df_time[["first_review", "last_review"]].apply(pd.to_datetime, axis=0)
@@ -66,7 +70,7 @@ class GraphLoader:
 
         return df_time
 
-    def get_neighourhood(self):
+    def get_neighourhood(self) -> pd.DataFrame:
         df_graph = self.clean_data()
         df_geo = self.get_geodata()
 
@@ -83,7 +87,7 @@ class GraphLoader:
 
         return df_graph
 
-    def get_folium(self):
+    def get_folium(self) -> pd.DataFrame:
         df_graph = self.clean_data()
         df_geo = self.get_geodata()
 
@@ -94,7 +98,7 @@ class GraphLoader:
 
         return df_geo.merge(df_graph, on = "c_quinsee")
 
-    def get_arr(self, df):
+    def get_arr(self, df) -> pd.DataFrame:
         df_geo = self.get_geodata()
         df = df[df["room_type"]=="Entire home/apt"]
         df_graph = df.groupby("l_qu").agg(count_properties=("l_qu", np.count_nonzero),
@@ -116,51 +120,130 @@ class GraphLoader:
 
 ###Methods for predictive parts####
 
-def load_folder(path: str) -> [pd.DataFrame]:
-    files = glob.glob(path + '/*.csv.gz')
-    for f in files:
-            # get filename
-            stock = os.path.basename(f)
-            if len(re.findall("listing", stock))>0:
-                temp_df = pd.read_csv(f)
-                # create new column with filename
-                temp_df['ticker'] = stock
-                temp_df['ticker'] = temp_df['ticker'].replace('.csv.gz', '', regex=True)
-                temp_df['ticker'] = temp_df['ticker'].replace('listings_', '', regex=True)
-                yield temp_df
+###Cleaning raw data###
+class DataLoader:
 
-def load_raw_data() -> pd.DataFrame:
-    if len(os.listdir(LOCAL_RAW_PATH))>0:
-        li = [df for df in load_folder(LOCAL_RAW_PATH)]
+    def __init__(self, path: str = LOCAL_RAW_PATH):
+        self.path = path
 
-    else:
-        full_file_path = os.path.join(os.getcwd(), "data")
-        li = [df for df in load_folder(full_file_path)]
+    def load_folder(self) -> [pd.DataFrame]:
+        """
+        A function to faciliate iterations over all available csvs in a given folder 
 
-    return pd.concat(li)
+        Returns
+        -------
+        [pd.DataFrame]
+            AA list of pd.DataFrame
 
-#Building target#
-def load_processed_data(file_name:str= None) -> pd.DataFrame:
+        Yields
+        ------
+        Iterator[[pd.DataFrame]]
+            One instance of the processed dataframe. Yields 1 by iteration over the list of csv files
+        """
+        files = glob.glob(self.path + '/*.csv.gz')
+        for f in files:
+                # get filename
+                stock = os.path.basename(f)
+                if len(re.findall("listing", stock))>0:
+                    temp_df = pd.read_csv(f)
+                    # create new column with filename
+                    temp_df['ticker'] = stock
+                    temp_df['ticker'] = temp_df['ticker'].replace('.csv.gz', '', regex=True)
+                    temp_df['ticker'] = temp_df['ticker'].replace('listings_', '', regex=True)
+                    yield temp_df
 
-    if file_name==None:
-        full_file_path = os.path.join(LOCAL_DATA_PATH, "None")
-    else:
-        full_file_path = os.path.join(LOCAL_DATA_PATH, file_name)
+    def load_raw_data(self) -> pd.DataFrame:
+        """
+        A function to convert the list of dataframe yielded by load_folder()
 
-    if not os.path.exists(full_file_path):
-        files = [os.path.join(LOCAL_DATA_PATH, file) for file in os.listdir(LOCAL_DATA_PATH) if file.endswith(".parquet.gzip")]
+        Leverages load_folder() and its yield structure to concatenate [pd.DataFrame] into 1 pd.DataFrame
 
-        if len(files) == 0:
-            print("No processed data, please use preprocess first")
-            return None
+        Returns
+        -------
+        pd.DataFrame
+            The full pd.DataFrame of raw data
+        """
+        if len(os.listdir())>0:
+            li = [df for df in self.load_folder()]
 
-        print("No corresponding parquet file, returning latest saved parquet")
-        full_file_path = max(files, key=os.path.getctime)
+        else:
+            full_file_path = os.path.join(os.getcwd(), "data")
+            li = [df for df in self.load_folder(full_file_path)]
 
-    data_processed = pd.read_parquet(full_file_path)
+        return pd.concat(li)
 
-    if data_processed.shape[0] < 10:
-        print("❌ Not enough processed data retrieved to train on")
-        return None
+    #Building target#
+    @staticmethod
+    def load_processed_data(file_name: str= None) -> pd.DataFrame:
+        """
+        A convenience function to load the processed data
 
-    return data_processed
+        Parameters
+        ----------
+        file_name : str, optional
+            The file to be loaded, if None returns the latest saved, by default None
+
+        Returns
+        -------
+        data_processed : pd.DataFrame
+            The loaded DataFrame
+        """
+
+        if file_name==None:
+            full_file_path = os.path.join(LOCAL_DATA_PATH, "None")
+        else:
+            full_file_path = os.path.join(LOCAL_DATA_PATH, file_name)
+
+        if not os.path.exists(full_file_path):
+            files = [os.path.join(LOCAL_DATA_PATH, file) for file in os.listdir(LOCAL_DATA_PATH) if file.endswith(".parquet.gzip")]
+
+            if len(files) == 0:
+                print("No processed data, please use preprocess first")
+                return None #Used to exit the function
+
+            print("No corresponding parquet file, returning latest saved parquet")
+            full_file_path = max(files, key=os.path.getctime)
+
+        data_processed = pd.read_parquet(full_file_path)
+
+        if data_processed.shape[0] < 10:
+            print("❌ Not enough processed data retrieved to train on")
+            return None #Used to exit the function
+
+        return data_processed
+    
+    def prep_data(self, file_name: str=None, target: str = "license") -> tuple[pd.DataFrame, pd.Series]:
+        """
+        A convenience function leveraging load_processed_data in the same class to provide additional processing. 
+        
+        Exists to avoid cluttering main.py
+
+        Parameters
+        ----------
+        file_name : str, optional
+            the path of the file with the data, if None, will default to the latest file, by default None
+        target : str, optional
+            The target feature to be defined as y, by default "license"
+
+        Returns
+        -------
+        tuple[pd.DataFrame, pd.Series]
+            A tuple containing the pd.DataFrame X of features and the pd.Series y of the target 
+        """
+        df = self.load_processed_data(file_name=file_name)
+        if df is None: #Used to exit the function and trigger an error if load_processed_data fails
+            return None, None
+
+        y= df[target].astype(int)
+        X = df.drop(columns=[target])
+
+        return X, y
+
+
+class LoadDataMixin():
+    """
+    A test class to check how mixins work
+    Is supposed to allow the ModelFlow class in main.py to inherit a method from DataLoader
+    """
+    def load_raw_data(self):
+        return super().load_raw_data()

@@ -1,11 +1,27 @@
 import pandas as pd
 import numpy as np
 from thefuzz import fuzz
-from scripts_thesis.cleaning import *
-from scripts_thesis.data import load_raw_data
+from scripts_thesis.cleaning import CleanData, SpacyClean
+from scripts_thesis.data import DataLoader
 from tqdm import tqdm
 
-def column_selector(df:pd.DataFrame):
+cd = CleanData()
+sc = SpacyClean()
+
+def column_selector(df: pd.DataFrame) -> list:
+    """
+    A convenience function used to determine which columns to drop from the dataset. 
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        The initial dataframe
+
+    Returns
+    -------
+    drop_list : list
+        A list of column names
+    """
     df_summary = df.describe(include="all").transpose()
     drop_list = [elem for elem in df_summary.index if df_summary.loc[elem, "count"] ==0]
     drop_list = drop_list + ["neighborhood_overview", "listing_url", "scrape_id", "host_url", "host_picture_url",\
@@ -16,6 +32,7 @@ def column_selector(df:pd.DataFrame):
     return drop_list
 
 def text_selector(df:pd.DataFrame)-> pd.DataFrame:
+
     df["host_about"] = df["host_about"].replace(np.nan, "")
     df["mask"] = df["host_about"].map(lambda row: len(row))
 
@@ -24,7 +41,7 @@ def text_selector(df:pd.DataFrame)-> pd.DataFrame:
     unique_val = df.groupby(["host_about"]).agg(mask = ("mask", np.mean)).reset_index()
 
     unique_val["group"] = np.nan
-    unique_val["host_about_2"] = unique_val["host_about"].map(lambda row: remove_proper_nouns(row))
+    unique_val["host_about_2"] = unique_val["host_about"].map(lambda row: cd.remove_proper_nouns(row))
     unique_val["mask"] = unique_val["host_about_2"].map(lambda row: len(row))
 
     unique_val = unique_val[unique_val["mask"]>50].reset_index(names="index_base")
@@ -76,13 +93,14 @@ def create_survival_rate(df:pd.DataFrame)-> pd.DataFrame:
     return df
 
 def preprocess_data(df:pd.DataFrame) -> pd.DataFrame:
+
     df = df.drop(column_selector(df), axis=1)
 
     df= df.sort_values(["id", "last_scraped"])
     df = df.drop_duplicates(subset =["id", "host_id", "license"])
     print("Step 1 done")
 
-    df["price"] = clean_price_vec(df["price"])
+    df["price"] = cd.clean_price_vec(df["price"])
     #upper_bound = np.quantile(df["price"], 0.75) * 10
     #mask = (df["price"]< upper_bound) & (5<df["price"]) & (df["number_of_reviews"]!=0)
     #df = df.loc[mask,:].reset_index(drop=True)
@@ -155,17 +173,18 @@ def clean_variables_features(df: pd.DataFrame, features: [str] = None, train_set
     df["host_is_superhost"] = np.where(df["host_is_superhost"]=="t", 1, 0)
 
     df["nb_amenities"] = df["amenities"].map(lambda row: len(row.split(",")))
-    df["amenities"] = clean_vec(df["amenities"].values)
+    df["amenities"] = cd.clean_vec(df["amenities"].values)
 
     df["description"] = df["description"].fillna(" ")
-    df["description"] = clean_vec(df["description"].values)
-    df["description"] = preprocess_spacy(df["description"].values)
+
+    df["description"] = cd.clean_vec(df["description"].values)
+    df["description"] = sc.preprocess_spacy(df["description"].values)
 
     df["host_about"] = df["host_about"].fillna(" ")
     df["has_host_about"] = np.where(df["host_about"].map(lambda row : len(row)>20), 1, 0)
-    df["host_about"] = clean_vec(df["host_about"].values)
-    df["host_about"] = preprocess_spacy(df["host_about"].values)
-
+    df["host_about"] = cd.clean_vec(df["host_about"].values)
+    df["host_about"] = sc.preprocess_spacy(df["host_about"].values)
+    
     if features is None:
         features = ["host_is_superhost", "host_identity_verified",
             "accommodates", "beds", "price", "number_of_reviews",
