@@ -13,10 +13,10 @@ from scripts_thesis.utils import get_top_features, model_explainer, plot_confusi
 from scripts_thesis.params import *
 from scripts_thesis.preproc import *
 
-import tensorflow as tf 
+import tensorflow as tf
 
 #####LAUNCH#####
-def main(): 
+def main():
     '''
     Method to input the parameters for the programme.
     '''
@@ -53,12 +53,12 @@ class ModelFlow(LoadDataMixin, DataLoader):
 
 
     def preprocess(self, model: bool=True) -> pd.DataFrame:
-        """      
+        """
         Load the raw data from the raw_data folder.\n
         Save the data locally if not in the raw data folder.\n
         Process query data.\n
         Store processed data in the processed directory.\n
-        Keeps 10 lines of data within the class to do some pred later on. 
+        Keeps 10 lines of data within the class to do some pred later on.
 
         Parameters
         ----------
@@ -68,7 +68,7 @@ class ModelFlow(LoadDataMixin, DataLoader):
         Returns
         -------
         data_clean_train : pd.DataFrame
-            A cleaned df saved locally and that can be used for training and testing afterwards. 
+            A cleaned df saved locally and that can be used for training and testing afterwards.
         data_clean_pred: pd.DataFrame
             A cleaned df saved in the class and that is used for predicted afterwards
         """
@@ -96,7 +96,7 @@ class ModelFlow(LoadDataMixin, DataLoader):
                     compression='gzip')
 
         print("✅ preprocess() done \n Saved localy")
-        
+
         return data_clean_pred
 
     #####MODEL#####
@@ -148,7 +148,9 @@ class ModelFlow(LoadDataMixin, DataLoader):
 
         y= data_processed[target]
         X = data_processed.drop(columns=[target])
-        
+
+        model = load_model()
+
         results, y_pred, y_test = evaluate_model(model, X, y)
 
         plot_confusion_matrix(y_test, y_pred)
@@ -171,7 +173,7 @@ class ModelFlow(LoadDataMixin, DataLoader):
         ----------
         X_pred : pd.DataFrame, optional
             The dataframe with the rows to predict, by default None
-            If none, some built-in examples will be used. 
+            If none, some built-in examples will be used.
 
         Returns
         -------
@@ -180,7 +182,7 @@ class ModelFlow(LoadDataMixin, DataLoader):
         """
         if X_pred is None:
             X_pred = self.pred_data #10 rows of the original data removed during preprocessing and never seen by the model
-            
+
         print("\n⭐️ Use case: predict")
 
         model = load_model()
@@ -198,7 +200,7 @@ class ModelFlow(LoadDataMixin, DataLoader):
         print("\n✅ Proba: ", y_pred_proba, "\n")
 
         return y_pred
-    
+
     @staticmethod
     def model_viz()-> None:
         '''
