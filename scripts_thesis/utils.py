@@ -71,7 +71,6 @@ def custom_combiner(feature, category):
     """
     return str(category)
 
-
 def get_top_features(model, has_selector: bool= True, top_n: int= 25, how: str= 'long') -> pd.DataFrame:
     """
     Convenience function to extract top_n predictor per class from a model.
@@ -124,6 +123,7 @@ def get_top_features(model, has_selector: bool= True, top_n: int= 25, how: str= 
 
     if has_selector:
         features = features[selector.get_support()]
+        
     axis_names = [f'feature_{x + 1}' for x in range(top_n)]
 
     if len(clf.classes_) > 2:
@@ -136,6 +136,7 @@ def get_top_features(model, has_selector: bool= True, top_n: int= 25, how: str= 
         idx = coefs.argsort()[::-1][:top_n]
         results = tuple(zip([clf.classes_[1]] * top_n, features[idx], coefs[idx]))
 
+
     df_lambda = pd.DataFrame(results, columns =  ['Class', 'feature', 'coef'])
 
     if how == 'wide':
@@ -147,7 +148,7 @@ def get_top_features(model, has_selector: bool= True, top_n: int= 25, how: str= 
 
     return df_lambda
 
-
+  
 def plot_confusion_matrix(y_true: np.array, y_pred: np.array, width= 400, height= 400) -> px.imshow:
     """
     Convenience function to print a confusion matrix with the predicted results y_pred

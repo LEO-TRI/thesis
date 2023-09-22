@@ -1,12 +1,10 @@
 import numpy as np
-import nltk
+import pandas as pd
 import string
-from nltk.corpus import stopwords
 import spacy
 import spacy_fastlang
 from spacy.language import Language
 from tqdm import tqdm
-
 
 class SpacyClean:
 
@@ -130,7 +128,3 @@ class CleanData:
         text = text[1:]
         text = text.translate(translator_p)
         return float(text)
-
-
-
-

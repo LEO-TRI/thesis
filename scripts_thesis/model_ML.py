@@ -4,10 +4,10 @@ from sklearn.experimental import enable_iterative_imputer
 from sklearn.impute import IterativeImputer
 from sklearn.model_selection import train_test_split, cross_validate, RepeatedStratifiedKFold
 from sklearn.metrics import accuracy_score, precision_score, f1_score, recall_score, classification_report, RocCurveDisplay, auc
-
 from sklearn.linear_model import LogisticRegression, SGDClassifier
 from sklearn.feature_selection import SelectKBest, chi2
 from sklearn.preprocessing import RobustScaler, OneHotEncoder
+from sklearn.pipeline import FeatureUnion
 from sklearn.compose import ColumnTransformer
 
 import pandas as pd
@@ -25,9 +25,7 @@ from colorama import Fore, Style
 import os
 import pickle
 
-
 scoring = ['accuracy', 'precision', 'recall', 'f1']
-
 
 def print_results(y_test: np.ndarray, y_pred: np.ndarray) -> dict:
     """
@@ -92,11 +90,13 @@ def baseline_model(y: np.ndarray, test_split: float=0.3) -> np.ndarray:
     print(Fore.BLUE + "\n Result for majority baseline" + Style.RESET_ALL)
     y_majority = np.zeros(len(y_test))
     print_results(y_test, y_majority)
-
+    
     return y_random, y_majority
 
 
-def build_pipeline(numeric_cols:[str], text_cols:[str], other_cols:[str], max_features:int=1000) -> Pipeline:
+def build_pipeline(numeric_cols:list[str], text_cols:list[str], other_cols:list[str], 
+                   description:str='description', amenities:str='amenities', host:str="host_about",
+                   max_features: int=1000, max_features_tfidf: int=10000, max_kbest: int=1000) -> Pipeline:
     """
     A convenience function created to quickly build a pipeline. Requires the columns' names for the column transformer.
     Pipeline takes a cleaned dataset.
@@ -121,34 +121,56 @@ def build_pipeline(numeric_cols:[str], text_cols:[str], other_cols:[str], max_fe
     """
 
     numeric_transformer = Pipeline(steps=[
-        ('imputer', IterativeImputer(random_state=42)),
+        ('imputer', IterativeImputer(random_state=1830)),
         ('scaler', RobustScaler())
     ])
-
-    text_transformer = Pipeline(steps=[
-        ('tfidf', TfidfVectorizer(max_features=max_features, ngram_range = (1, 3), max_df=0.8, norm="l2"))
-    ])
-
-    other_transformer = Pipeline(steps=[
-        ('onehot', OneHotEncoder(drop='first', sparse_output=False))#, feature_name_combiner=custom_combiner))
-    ])
-
-    preprocessor = ColumnTransformer(
+    
+    num_transformer = ColumnTransformer(
         transformers=[
             ('num', numeric_transformer, numeric_cols),
-            ('text', text_transformer, text_cols),
-            ('other', other_transformer, other_cols)
-        ])
+        ],
+        remainder='drop'  # Pass through any other columns not specified
+    )
 
-    pipeline = Pipeline(steps=[("balancing", RandomUnderSampler(random_state=1830)),
-                               ('preprocessor', preprocessor),
-                               #('smote', SMOTE(random_state=42, k_neighbors=20)),
-                               ('selector', SelectKBest(chi2, k = 2000)),
-                               ('clf', LogisticRegression(penalty = 'l2', C = .9,
-                                multi_class = 'multinomial', class_weight = 'balanced',
-                                random_state = 42, solver = 'newton-cg', max_iter = 100))
-                               ])
+    text_transformers = ColumnTransformer(
+        transformers=[
+            ('text1', TfidfVectorizer(max_features=max_features_tfidf, ngram_range = (1, 3), max_df=0.8, norm="l1"), description),
+            ('text2', TfidfVectorizer(max_features=max_features_tfidf, ngram_range = (1, 3), max_df=0.8, norm="l1"), amenities),
+            ('text3', TfidfVectorizer(max_features=max_features_tfidf, ngram_range = (1, 3), max_df=0.8, norm="l1"), host)
+            ],
+        remainder='drop'  # Pass through any other columns not specified
+        )
 
+    text_pipe = Pipeline([
+        ('text_preprocessing', text_transformers),
+        ('selectkbest', SelectKBest(chi2, k=max_kbest))
+        ]
+                         )
+    
+    cat_transformer = ColumnTransformer(
+        transformers=[
+            ('cat', OneHotEncoder(), other_cols)
+        ],
+        remainder='drop'  # Pass through any other columns not specified
+    )
+
+    column_transformer = FeatureUnion([("text", text_pipe),
+                                       ("num", num_transformer),
+                                       ("cat", cat_transformer)
+                                       ])
+
+    # Create the final pipeline
+    pipeline = Pipeline([
+        ("balancing", RandomUnderSampler(random_state=1830)),
+        ('preprocessing', column_transformer),
+       #('smote', SMOTE(random_state=42, k_neighbors=20)),
+       #('selector', SelectKBest(chi2, k = 2000)),
+        ('classifier', LogisticRegression(penalty = 'l2', C = .9,
+                                multi_class = 'auto', class_weight = 'balanced',
+                                random_state = 1830, solver = 'newton-cg', max_iter = 100))
+        ]
+                        )
+    
     return pipeline
 
 
@@ -178,10 +200,10 @@ def train_model(X: pd.DataFrame, y: np.ndarray, test_split: float=0.3, max_featu
     """
 
     numeric_cols = X.select_dtypes(include=[np.number]).columns
-    text_cols = ["description", "amenities"]
+    text_cols = ["amenities", "description", "host_about"]
     other_cols = list(set(X.columns) - set(numeric_cols) - set(text_cols))
 
-    pipe_model = build_pipeline(numeric_cols, text_cols, other_cols, max_features = max_features)
+    pipe_model = build_pipeline(numeric_cols, other_cols, max_features_tfidf = max_features)
 
     print(Fore.BLUE + "\nLaunching CV" + Style.RESET_ALL)
 

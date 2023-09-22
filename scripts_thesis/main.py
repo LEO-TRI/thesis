@@ -9,6 +9,7 @@ from colorama import Fore, Style
 from scripts_thesis.data import DataLoader, LoadDataMixin
 from scripts_thesis.model_ML import train_model, evaluate_model, predict_model, load_model
 from scripts_thesis.utils import get_top_features, model_explainer, plot_confusion_matrix
+
 from scripts_thesis.params import *
 from scripts_thesis.preproc import *
 
@@ -147,8 +148,7 @@ class ModelFlow(LoadDataMixin, DataLoader):
 
         y= data_processed[target]
         X = data_processed.drop(columns=[target])
-
-        model = load_model()
+        
         results, y_pred, y_test = evaluate_model(model, X, y)
 
         plot_confusion_matrix(y_test, y_pred)
@@ -227,9 +227,8 @@ class ModelFlow(LoadDataMixin, DataLoader):
 
 if __name__ == '__main__':
     #agreement, target = main()
-    local_setup()
+    #local_setup()
     print("✅ Setup done")
-
     ml = ModelFlow()
     ml.pred_data = ml.preprocess() #Used to keep some prediction data unseen by the model
     print("✅ Process done")

@@ -1,11 +1,12 @@
 import pandas as pd
 import numpy as np
 from thefuzz import fuzz
-from scripts_thesis.cleaning import *
-from scripts_thesis.data import load_raw_data
+from scripts_thesis.cleaning import CleanData, SpacyClean
+from scripts_thesis.data import DataLoader
 from tqdm import tqdm
 
 cd = CleanData()
+sc = SpacyClean()
 
 def column_selector(df: pd.DataFrame) -> list:
     """
@@ -159,11 +160,14 @@ def preprocess_data(df:pd.DataFrame) -> pd.DataFrame:
 
 ###Additional preproc for model preparation###
 
-def clean_variables_features(df: pd.DataFrame, features: [str] =None) -> pd.DataFrame:
+def clean_variables_features(df: pd.DataFrame, features: [str] = None, train_set:bool = True) -> pd.DataFrame:
 
-    upper_bound = np.quantile(df["price"], 0.75) * 10
-    mask = (df["price"]< upper_bound) & (5<df["price"]) & (df["number_of_reviews"]!=0)
-    df = df.loc[mask,:].reset_index(drop=True)
+    if train_set:
+        upper_bound = np.quantile(df["price"], 0.75) * 10
+        df["description"] = df["description"].fillna(" ")
+
+        mask = (df["price"]< upper_bound) & (5<df["price"]) & (df["number_of_reviews"]!=0) & (df["description"].map(lambda row : len(row)>1))
+        df = df.loc[mask,:].reset_index(drop=True)
 
     df["host_identity_verified"] = np.where(df["host_identity_verified"]=="t", 1, 0)
     df["host_is_superhost"] = np.where(df["host_is_superhost"]=="t", 1, 0)
@@ -172,18 +176,23 @@ def clean_variables_features(df: pd.DataFrame, features: [str] =None) -> pd.Data
     df["amenities"] = cd.clean_vec(df["amenities"].values)
 
     df["description"] = df["description"].fillna(" ")
+
     df["description"] = cd.clean_vec(df["description"].values)
+    df["description"] = sc.preprocess_spacy(df["description"].values)
 
-    mask = df["description"].map(lambda row : len(row)>1)
-
+    df["host_about"] = df["host_about"].fillna(" ")
+    df["has_host_about"] = np.where(df["host_about"].map(lambda row : len(row)>20), 1, 0)
+    df["host_about"] = cd.clean_vec(df["host_about"].values)
+    df["host_about"] = sc.preprocess_spacy(df["host_about"].values)
+    
     if features is None:
         features = ["host_is_superhost", "host_identity_verified",
             "accommodates", "beds", "price", "number_of_reviews",
             "review_scores_rating", "amenities", "license",
             "reviews_per_month", "neighbourhood_cleansed",
-            "host_listings_count", "description", "host_about"]
+            "host_listings_count", "description", "has_host_about", "host_about"]
 
-    df = df.loc[mask, features]
+    df = df.loc[:, features]
 
     return df.fillna(value=np.nan)
 
