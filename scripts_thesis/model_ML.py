@@ -7,9 +7,7 @@ from sklearn.metrics import accuracy_score, precision_score, f1_score, recall_sc
 from sklearn.linear_model import LogisticRegression, SGDClassifier
 from sklearn.feature_selection import SelectKBest, chi2
 from sklearn.preprocessing import RobustScaler, OneHotEncoder, FunctionTransformer
-#from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
-
 
 import pandas as pd
 import numpy as np
@@ -26,10 +24,28 @@ from colorama import Fore, Style
 import os
 import pickle
 
+
 scoring = ['accuracy', 'precision', 'recall', 'f1']
 
 
 def print_results(y_test: np.array, y_pred: np.array) -> dict:
+    """
+    Convenience function used to quickly compute and display the evaluation metrics of a model. 
+    Can be used after getting y_pred from a trained model. 
+    Retuurns a dictionnary with 4 metrics and their corresponding values.
+
+    Parameters
+    ----------
+    y_test : np.array
+        Array of the real values 
+    y_pred : np.array
+        Array of the predicted values
+
+    Returns
+    -------
+    dict
+        Dictionnary of evaluation metrics
+    """
     metrics = [np.round(accuracy_score(y_test, y_pred), 2),
                np.round(precision_score(y_test, y_pred, zero_division= 0), 2),
                np.round(recall_score(y_test, y_pred, zero_division= 0), 2),
@@ -49,23 +65,61 @@ def print_results(y_test: np.array, y_pred: np.array) -> dict:
 
 def baseline_model(y: np.array,
         test_split: float=0.3
-    ) -> None:
+    ) -> np.array:
+    """
+    Function computing the baseline to beat by the new model. 
+    Produces two baseline, one coming from a random guess and the other from predicting only the majority class
+
+    Parameters
+    ----------
+    y : np.array/array_like
+        The target feature
+    test_split : float, optional
+        The split ratio between train and test, by default 0.3
+
+    Returns
+    -------
+    np.array
+        Array of predicted results. 
+    """
 
     print(Fore.MAGENTA + "\n ⭐️ Results to beat" + Style.RESET_ALL)
     y_train, y_test = train_test_split(y, test_size=test_split, random_state=42, stratify=y)
 
     print(Fore.BLUE + "\n Result for random baseline" + Style.RESET_ALL)
-
-    print(Fore.BLUE + "\n Result for random baseline" + Style.RESET_ALL)
-    y_baseline = np.random.randint(0, 2, size=len(y_test))
-    print_results(y_test, y_baseline)
+    y_random = np.random.randint(0, 2, size=len(y_test))
+    print_results(y_test, y_random)
 
     print(Fore.BLUE + "\n Result for majority baseline" + Style.RESET_ALL)
-    y_baseline = np.zeros(len(y_test))
-    print_results(y_test, y_baseline)
+    y_majority = np.zeros(len(y_test))
+    print_results(y_test, y_majority)
+
+    return y_random, y_majority
 
 
-def build_pipeline(numeric_cols:[str], text_cols:[str], other_cols:[str], max_features:int=1000):
+def build_pipeline(numeric_cols:[str], text_cols:[str], other_cols:[str], max_features:int=1000) -> Pipeline:
+    """
+    A convenience function created to quickly build a pipeline. Requires the columns' names for the column transformer.
+    Pipeline takes a cleaned dataset.
+    Pipeline does the preprocessing, the balancing of the classes and instantiate a sklearn's model. 
+    Returns the pipeline.
+
+    Parameters
+    ----------
+    numeric_cols : list(str)
+        The numerical columns of the dataset
+    text_cols : list(str)
+        The text columns of the dataset
+    other_cols : list(str)
+        The remaining columns of the dataset
+    max_features : int, optional
+        How many columns to keep from the tfidf vectorization, by default 1000
+
+    Returns
+    -------
+    Pipeline
+        A sklearn pipeline, not fitted
+    """
 
     numeric_transformer = Pipeline(steps=[
         ('imputer', IterativeImputer(random_state=42)),
@@ -104,10 +158,27 @@ def train_model(
         y: np.array,
         test_split: float=0.3,
         max_features: int=1000
-    ):
-    """
-    Fit the model and return a tuple (fitted_model, history)
-    print(Fore.BLUE + "\nTraining model..." + Style.RESET_ALL)
+    ) -> Pipeline:
+    """ 
+    Fit the passed model with the passed data and return a tuple (fitted_model, history)
+
+    Parameters
+    ----------
+    X : pd.DataFrame
+        The dataframe of features
+    y : pd.Series
+        The target variable
+    test_split : float, optional
+        _description_, by default 0.3
+    max_features : int, optional
+        _description_, by default 1000
+
+    Returns
+    -------
+    Pipeline
+        A fitted pipeline object
+    res : pd.DataFrame
+        A dataframe with the mean cross-validated metrics (4 in total) 
     """
 
     numeric_cols = X.select_dtypes(include=[np.number]).columns
@@ -139,10 +210,31 @@ def evaluate_model(
         X: pd.DataFrame,
         y: pd.Series,
         test_split:float=0.3
-    ):
+    ) -> pd.DataFrame:
     """
     Evaluate trained model performance on the dataset
+
+    Parameters
+    ----------
+    model : _type_
+        A sklearn model, instantiated from a pickle file or trained before. 
+    X : pd.DataFrame
+        The dataframe of features
+    y : pd.Series
+        The target variable
+    test_split : float, optional
+        The split ratio between train and test, by default 0.3
+
+    Returns
+    -------
+    pd.DataFrame
+        A dataframe with the evaluated metrics (4 metrics)
+    y_pred: np.array
+        A np.array of the model's prediction
+    y_test: np.array
+        A np.array of the real data
     """
+    
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_split, random_state=42, stratify=y)
 
     print(Fore.BLUE + f"\nEvaluating model on {len(X_test)} rows..." + Style.RESET_ALL)
@@ -171,11 +263,37 @@ def evaluate_model(
     return pd.DataFrame(results, index=[0]), y_pred, y_test
 
 
-def predict_model(model, X:str) -> np.array:
+def predict_model(model, X: str) -> np.array:
+    """_summary_
+
+    Parameters
+    ----------
+    model : _type_
+        _description_
+    X : str
+        _description_
+
+    Returns
+    -------
+    np.array
+        _description_
+    """
     return model.predict(X), model.predict_proba(X)
 
 
-def load_model(model_name:str = None):
+def load_model(model_name: str = None) -> None:
+    """_summary_
+
+    Parameters
+    ----------
+    model_name : str, optional
+        _description_, by default None
+
+    Returns
+    -------
+    _type_
+        _description_
+    """
     if model_name==None:
         full_file_path = os.path.join(LOCAL_MODEL_PATH, "None")
     else:

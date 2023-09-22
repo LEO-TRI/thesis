@@ -10,13 +10,17 @@ from scripts_thesis.params import *
 ###Methods for descriptive part####
 
 class GraphLoader:
+    """
+    Convenience class used to load the dataset used for graph representation at different 
+    levels of processing.
+    """
 
-    def get_geodata(self):
+    def get_geodata(self) -> pd.DataFrame:
         tmp_ = gpd.read_file(os.path.join("data", 'quartier_paris.geojson'))
         tmp_["c_quinsee"] = pd.to_numeric(tmp_["c_quinsee"])
         return tmp_
 
-    def get_data(self, graph=True):
+    def get_data(self, graph: bool=True) -> pd.DataFrame:
         """
         This function returns a Python dict.
         Its keys should be 'sellers', 'orders', 'order_items' etc...
@@ -40,7 +44,7 @@ class GraphLoader:
 
         return df_graph
 
-    def clean_data(self, graph:bool=True):
+    def clean_data(self, graph: bool=True) -> pd.DataFrame:
         df_graph = self.get_data(graph=graph)
         df_graph["arr"] = df_graph["c_quinsee"].map(lambda row: str(row)[2:4])
 
@@ -49,7 +53,7 @@ class GraphLoader:
 
         return df_graph.loc[mask,:].reset_index(drop=True)
 
-    def get_occupancy_rate(self):
+    def get_occupancy_rate(self) -> pd.DataFrame:
         df_time = self.clean_data()
 
         df_time.loc[:, ["first_review", "last_review"]] = df_time[["first_review", "last_review"]].apply(pd.to_datetime, axis=0)
@@ -66,7 +70,7 @@ class GraphLoader:
 
         return df_time
 
-    def get_neighourhood(self):
+    def get_neighourhood(self) -> pd.DataFrame:
         df_graph = self.clean_data()
         df_geo = self.get_geodata()
 
@@ -83,7 +87,7 @@ class GraphLoader:
 
         return df_graph
 
-    def get_folium(self):
+    def get_folium(self) -> pd.DataFrame:
         df_graph = self.clean_data()
         df_geo = self.get_geodata()
 
@@ -94,7 +98,7 @@ class GraphLoader:
 
         return df_geo.merge(df_graph, on = "c_quinsee")
 
-    def get_arr(self, df):
+    def get_arr(self, df) -> pd.DataFrame:
         df_geo = self.get_geodata()
         df = df[df["room_type"]=="Entire home/apt"]
         df_graph = df.groupby("l_qu").agg(count_properties=("l_qu", np.count_nonzero),
@@ -147,7 +151,7 @@ class DataLoader:
 
     #Building target#
     @staticmethod
-    def load_processed_data(file_name:str= None) -> pd.DataFrame:
+    def load_processed_data(file_name: str= None) -> pd.DataFrame:
 
         if file_name==None:
             full_file_path = os.path.join(LOCAL_DATA_PATH, "None")
@@ -159,7 +163,7 @@ class DataLoader:
 
             if len(files) == 0:
                 print("No processed data, please use preprocess first")
-                return None
+                return None #Used to exit the function
 
             print("No corresponding parquet file, returning latest saved parquet")
             full_file_path = max(files, key=os.path.getctime)
@@ -168,6 +172,6 @@ class DataLoader:
 
         if data_processed.shape[0] < 10:
             print("❌ Not enough processed data retrieved to train on")
-            return None
+            return None #Used to exit the function
 
         return data_processed
