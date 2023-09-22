@@ -34,7 +34,7 @@ class SpacyClean:
                 docs.append(' '.join(tokens))
                 mask.append(ind)
             elif doc._.language == "fr":
-                for token in nlp_fr(doc.text):
+                for token in self.nlp_fr(doc.text):
                     if token.pos_ in ['NOUN', 'VERB', 'ADJ']:
                         tokens.append(token.lemma_)
                 docs.append(' '.join(tokens))
