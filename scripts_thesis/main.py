@@ -6,14 +6,14 @@ import pickle
 
 from colorama import Fore, Style
 
-from scripts_thesis.data import load_raw_data, load_processed_data
+from scripts_thesis.data import DataLoader
 from scripts_thesis.model_ML import train_model, evaluate_model, predict_model, load_model
-#from scripts_thesis.cleaning import clean_predict
+from scripts_thesis.utils import get_top_features, model_explainer, plot_confusion_matrix
 from scripts_thesis.params import *
 from scripts_thesis.preproc import *
 
 #####LAUNCH#####
-def main(agreement=0.8, target="sdg"):
+def main(): 
     '''
     Method to input the parameters for the programme.
     '''
@@ -50,7 +50,9 @@ def preprocess(model:bool=True) -> None:
     print(Fore.MAGENTA + "\n ⭐️ Use case: preprocess" + Style.RESET_ALL)
 
     # Process data
-    df = load_raw_data()
+    dl = DataLoader()
+    df = dl.load_raw_data()
+
     data_clean = preprocess_data(df)
 
     if model:
@@ -83,7 +85,7 @@ def train(file_name:str = None,
     print(Fore.MAGENTA + "\n⭐️ Use case: train" + Style.RESET_ALL)
     print(Fore.BLUE + "\nLoading preprocessed validation data..." + Style.RESET_ALL)
 
-    data_processed = load_processed_data(file_name=file_name)
+    data_processed = DataLoader.load_processed_data(file_name=file_name)
     if data_processed is None: #Used to exit the function and trigger an error if load_processed_data fails
         return None
 
@@ -120,7 +122,7 @@ def model_viz()-> None:
     full_file_path = os.path.join(LOCAL_COEFS_PATH, file_name)
     df.to_csv(full_file_path, index=False)
 
-    fig = sdg_explainer(df=df)
+    fig = model_explainer(df=df)
 
     file_name = f'coefs_model_V{model_iteration}.jpeg'
     full_file_path = os.path.join(LOCAL_IMAGE_PATH, file_name)
@@ -135,7 +137,7 @@ def evaluate(file_name:str = None,
     """
     print(Fore.MAGENTA + "\n⭐️ Use case: evaluate" + Style.RESET_ALL)
 
-    data_processed = load_processed_data(file_name=file_name)
+    data_processed = DataLoader.load_processed_data(file_name=file_name)
     if data_processed is None:
         return None
 
