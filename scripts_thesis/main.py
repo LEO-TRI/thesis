@@ -12,6 +12,8 @@ from scripts_thesis.utils import get_top_features, model_explainer, plot_confusi
 from scripts_thesis.params import *
 from scripts_thesis.preproc import *
 
+import tensorflow as tf 
+
 #####LAUNCH#####
 def main(): 
     '''

@@ -7,7 +7,10 @@ import seaborn as sns
 
 from sklearn.metrics import accuracy_score, f1_score, confusion_matrix, precision_score
 import plotly.express as px
+import plotly.graph_objects as go
 
+hex_colors = [mcolors.to_hex(color) for color in sns.diverging_palette(145, 300, s=60, n=5)]
+hex_colors.reverse()
 
 def date_range(min_date, date, max_date) -> [bool]:
     return (min_date <= date <= max_date)
@@ -246,3 +249,47 @@ def model_explainer(df: pd.DataFrame, x: str= "coef", y: str= "feature")-> px.ba
     fig.show()
 
     return fig
+
+
+def model_dl_examiner(train: np.ndarray, val: np.ndarray) -> go.Figure:
+    """
+    A convenience function to produce the train and val loss for a trained TF model 
+
+    Parameters
+    ----------
+    train : np.ndarray
+        The history of train losses
+    val : np.ndarray
+        The history of val losses
+
+    Returns
+    -------
+    go.Figure
+        A plotly line chart
+    """
+
+    assert len(train) == len(val)
+
+    x = np.arange(len(train))
+
+    fig = go.Figure()
+
+    for color, name, line in zip([hex_colors[0], hex_colors[-1]], ["Train results", "Val results"], [train, val]):
+        fig.add_trace(
+            go.Scatter(x=x, y=line, mode='lines', name=name, marker_color = color)
+            )
+    
+    fig.update_layout(
+        xaxis=dict(title='Epochs'),
+        yaxis=dict(title='Loss: Binary cross-entropy'),
+        title="Train and val losses across epochs", 
+        legend=dict(
+        orientation="v",
+        yanchor="bottom",
+        y=0.8,
+        xanchor="right",
+        bgcolor="LightSteelBlue",
+        x=0.98)
+        )
+
+    fig.show()
