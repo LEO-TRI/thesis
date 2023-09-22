@@ -1,15 +1,7 @@
 ########################### DL TEMPLATE ##############################
 import tensorflow as tf
-from tensorflow.keras.callbacks import EarlyStopping
-from tensorflow.keras import models, layers, models, Input
-from tensorflow.keras.models import Sequential
 
 import numpy as np
-
-import nltk
-nltk.download('stopwords')
-nltk.download('punkt')
-from nltk import word_tokenize
 
 from sklearn.model_selection import train_test_split
 
@@ -18,15 +10,14 @@ word2vec_transfer = api.load("glove-wiki-gigaword-100")
 
 from scripts_thesis.data import DataLoader
 
-df = DataLoader.load_processed_data()
-
+dl = DataLoader()
+df = dl.prep_data()
 X = df.drop(columns=["license"])
 y = df["license"]
 
-X_train, X_test, y_train, y_test = train_test_split(X, y,
+X_train, X_test, y_train, y_test = train_test_split(X, y, 
                                     train_size=0.8,
                                     random_state=42)
-
 
 def embed_sentence_with_TF(word2vec: object, sentence: list[str]) -> list:
     """
@@ -37,19 +28,14 @@ def embed_sentence_with_TF(word2vec: object, sentence: list[str]) -> list:
     word2vec : object
         The model used to provide the embeddings
     sentence : list[str]
-        The sentence to embed 
+        The sentence to embed represented as a list of words
 
     Returns
     -------
     list
-        An list of embeddings for each sentence
+        An list of embeddings for each sentence. Has dimensions (len(sentence) , len(word2vec_model))
     """
-    embedded_sentence = []
-    for word in sentence:
-        if word in word2vec:
-            embedded_sentence.append(word2vec[word])
-
-    return embedded_sentence
+    return [word2vec[word] for word in sentence if word in word2vec]
 
 
 def preprocess_dl_text(X: np.ndarray, max_len: int=200) -> tf.Tensor:
@@ -58,7 +44,7 @@ def preprocess_dl_text(X: np.ndarray, max_len: int=200) -> tf.Tensor:
 
     Parameters
     ----------
-    X : np.array
+    X : np.ndarray
         A 1-dimension np.array of strings
     max_len: int
         The len of the outputed tensor. Will determine how much each text will be padded/truncated
@@ -69,61 +55,109 @@ def preprocess_dl_text(X: np.ndarray, max_len: int=200) -> tf.Tensor:
         A full tensor of embeddings 
     """
 
-    X = [word_tokenize(text) for text in X]
+    X = [tf.strings.split(text, " ").numpy() for text in X]
     X_embed = [embed_sentence_with_TF(word2vec_transfer, sentence) for sentence in X] 
     X_pad = tf.keras.utils.pad_sequences(X_embed, dtype='float32', padding='post', maxlen=max_len)
 
     return tf.convert_to_tensor(X_pad)
 
-
+#TODO
 X_train = preprocess_dl_text()
 X_test = preprocess_dl_text()
 
-embedding_dims = 200 #Length of the token vectors
-filters = 10 #number of filters in your Convnet
-kernel_size = 3 # a window size of 3 tokens
 
+#emb = Embedding(output_dim=embedding_size, input_dim=100, input_length=seq_length)(nlp_input)
+#nlp_out = Bidirectional(LSTM(128, dropout=0.3, recurrent_dropout=0.3, kernel_regularizer=regularizers.l2(0.01)))(nlp_input)
 
+class NeuralModel:
 
+    def __init__(self, embedding_dims: int = 200) -> None:
+        self.embedding_dims = embedding_dims
 
-nlp_input = Input(shape=(seq_length,), name='nlp_input')
-emb = Embedding(output_dim=embedding_size, input_dim=100, input_length=seq_length)(nlp_input)
-nlp_out = Bidirectional(LSTM(128, dropout=0.3, recurrent_dropout=0.3, kernel_regularizer=regularizers.l2(0.01)))(emb)
+    def build_model(self) -> tf.keras.Model:
+        """
+        Function to build a double input neural network model
 
-meta_input = Input(shape=(10,), name='meta_input')
+        Usually will rarely be called alone but will be used in compile_model()
 
-x = concatenate([nlp_out, meta_input])
-x = Dense(classifier_neurons, activation='relu')(x)
-x = Dense(1, activation='sigmoid')(x)
-model = Model(inputs=[nlp_input , meta_input], outputs=[x])
+        Returns
+        -------
+        tf.keras.Model
+            The built model. Still needs to be compiled.
+        """
+        num_input = tf.keras.Input(shape=(10,), name='num_input') #TODO
+        nlp_input = tf.keras.Input(shape=(self.embedding_dims,), name='nlp_input')
+        x = tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(128, activation="tanh", dropout=0.3, return_sequences=True))(nlp_input)
+        nlp_out = tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(128, activation="tanh", return_sequences=False))(x)
 
+        x = tf.keras.layers.Concatenate([nlp_out, num_input])
+        x = tf.keras.layers.Dense(130, activation="relu")(x)
+        x = tf.keras.layers.Dropout(0.30)(x)
+        x = tf.keras.layers.Dense(80, activation="relu")(x)
+        x = tf.keras.layers.Dropout(0.30)(x)
+        x = tf.keras.layers.Dense(1, activation="sigmoid")(x)
+        model = tf.keras.Model(inputs=[nlp_input , num_input], outputs=[x])
 
+        return model
+    
+    def compile_model(self, loss: str= "binary_crossentropy", optimizer: str= "adam") -> tf.keras.Model:
+        """
+        Function to compile a model. 
 
-model = Sequential()
-model.add(tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(128, activation="tanh", return_sequences=False)))
-model.add(tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(128, activation="tanh", return_sequences=True)))
-model.add(tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(128, activation="tanh")))
-model.add(layers.Dense(130, activation="relu"))
-model.add(layers.Dropout(0.30))
-model.add(layers.Dense(80, activation="relu"))
-model.add(layers.Dropout(0.30))
-model.add(layers.Dense(y_train.shape[1], activation="softmax"))
+        Uses build_model() to load a (not-compiled) model
 
-model.compile(loss='categorical_crossentropy', optimizer='adam',
-            metrics=[tf.keras.metrics.CategoricalAccuracy(),
-                    tf.keras.metrics.Precision()]
-            )
+        Usually will rarely be called alone but will be used in train_model()
 
-epochs = 500
+        Parameters
+        ----------
+        loss : str, optional
+            The loss function, by default "binary_crossentropy"
+        optimizer : str, optional
+            The optimizer, by default "adam"
 
-es = EarlyStopping(patience=20, restore_best_weights=True)
+        Returns
+        -------
+        tf.keras.Model
+            The compiled model 
+        """
+        model = self.build_model()
+        model.compile(loss=loss, optimizer=optimizer, metrics=[tf.keras.metrics.CategoricalAccuracy(), tf.keras.metrics.Precision()])
 
-history = model.fit(X_train, y_train,
-                    validation_split=0.2,
-                    batch_size = 16,
+        return model
+    
+    def train_model(self, epochs: int= 500, patience: int= 20, batch_size: int= 16, validation_split: float= 0.2) -> tf.keras.Model:
+        """
+        Function to centralise the methods required to train the neural network. 
+
+        Uses compile_model() to load the compiled model
+
+        Parameters
+        ----------
+        epochs : int, optional
+            The max number of epochs, by default 500
+        patience : int, optional
+            The number of epochs before early stopping, by default 20
+        batch_size : int, optional
+            The batch size, by default 16
+        validation_split: float, optional
+            The validation split for the train data, by default 0.2
+
+        Returns
+        -------
+        tf.keras.Model
+            A trained model with weights and history
+        """
+        model = self.compile_model()
+        es = tf.keras.callbacks.EarlyStopping(patience=patience, restore_best_weights=True)
+        
+        history = model.fit(X_train, y_train,
+                    validation_split=validation_split,
+                    batch_size = batch_size,
                     #verbose = 0,
                     epochs=epochs,
                     callbacks=[es]
                     )
+        
+        return history
 
 
