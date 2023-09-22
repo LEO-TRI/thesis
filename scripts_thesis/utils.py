@@ -5,9 +5,13 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import seaborn as sns
 
-from sklearn.metrics import accuracy_score, f1_score, confusion_matrix, precision_score
-import plotly.express as px
+from sklearn.metrics import accuracy_score, f1_score, confusion_matrix, precision_score, RocCurveDisplay, auc
 
+import plotly.express as px
+import plotly.graph_objects as go
+
+hex_colors = [mcolors.to_hex(color) for color in sns.diverging_palette(145, 300, s=60, n=5)]
+hex_colors.reverse()
 
 def date_range(min_date, date, max_date) -> [bool]:
     return (min_date <= date <= max_date)
@@ -23,7 +27,8 @@ def update_prop(handle, orig):
 
 
 def table_color(data:pd.Series, palette_min: int=145, palette_up: int=300, n: int=5) -> list:
-    """Convenience function to convert a numerical sequence into a color sequence based on its quantiles
+    """
+    Convenience function to convert a numerical sequence into a color sequence based on its quantiles
 
     Parameters
     ----------
@@ -59,20 +64,35 @@ def line_adder(h_coord=0.5, color="black", linestyle="-", *args):
 
 
 def custom_combiner(feature, category):
+    """
+    A convenience function that can be used in sklearn's ohe to format column names.
+    Requires sklearn version >= 1.3.0
+
+    """
     return str(category)
 
 
-def get_top_features(model, has_selector: bool = True, top_n: int = 25, how: str = 'long') -> pd.DataFrame:
-    """Convenience function to extract top_n predictor per class from a model.
+def get_top_features(model, has_selector: bool= True, top_n: int= 25, how: str= 'long') -> pd.DataFrame:
+    """
+    Convenience function to extract top_n predictor per class from a model.
 
     Parameters
     ----------
-    vectoriser : _type_
-        The sklearn vectoriser used to transform strings into words
-    clf : _type_
-        The sklearn model used to classify the data 
-    selector : _type_, optional
-        The selector used to reduce the number of features, by default None
+    model : imblearn.pipeline.Pipeline or sklearn.pipeline.Pipeline
+        The model must have 4 elements: 
+
+            vectoriser : sklearn.feature_extraction.text.TfidfVectorizer
+                The sklearn vectoriser used to transform strings into words
+
+            clf : sklearn.linear_model.LogisticRegression
+                The sklearn predictor used to classify the data 
+
+            ohe: sklearn.preprocessing.OneHotEncoder      
+                The sklearn preprocessor for categorical data
+
+            selector : sklearn.feature_selection.SelectKBest, optional
+                The sklearn selector used to reduce the number of features, by default None
+
     top_n : int, optional
         Number of top features to return, by default 25
     how : str, optional
@@ -128,8 +148,9 @@ def get_top_features(model, has_selector: bool = True, top_n: int = 25, how: str
     return df_lambda
 
 
-def plot_confusion_matrix(y_true: np.array, y_pred: np.array, width=400, height=400) -> px.imshow:
-    """_summary_
+def plot_confusion_matrix(y_true: np.array, y_pred: np.array, width= 400, height= 400) -> px.imshow:
+    """
+    Convenience function to print a confusion matrix with the predicted results y_pred
 
     Parameters
     ----------
@@ -188,7 +209,8 @@ def plot_confusion_matrix(y_true: np.array, y_pred: np.array, width=400, height=
 
 
 def model_explainer(df: pd.DataFrame, x: str= "coef", y: str= "feature")-> px.bar:
-    """A function that takes the dataframe outputed by get_top_features() and creates a barplot of most important features using Plotly
+    """
+    A function that takes the dataframe outputed by get_top_features() and creates a barplot of most important features using Plotly
 
     Parameters
     ----------
@@ -228,3 +250,105 @@ def model_explainer(df: pd.DataFrame, x: str= "coef", y: str= "feature")-> px.ba
     fig.show()
 
     return fig
+
+
+def model_dl_examiner(train: np.ndarray, val: np.ndarray) -> go.Figure:
+    """
+    A convenience function to produce the train and val loss for a trained TF model 
+
+    Parameters
+    ----------
+    train : np.ndarray
+        The history of train losses
+    val : np.ndarray
+        The history of val losses
+
+    Returns
+    -------
+    go.Figure
+        A plotly line chart
+    """
+
+    assert len(train) == len(val)
+
+    x = np.arange(len(train))
+
+    fig = go.Figure()
+
+    for color, name, line in zip([hex_colors[0], hex_colors[-1]], ["Train results", "Val results"], [train, val]):
+        fig.add_trace(
+            go.Scatter(x=x, y=line, mode='lines', name=name, marker_color = color)
+            )
+    
+    fig.update_layout(
+        xaxis=dict(title='Epochs'),
+        yaxis=dict(title='Loss: Binary cross-entropy'),
+        title="Train and val losses across epochs", 
+        legend=dict(
+        orientation="v",
+        yanchor="bottom",
+        y=0.8,
+        xanchor="right",
+        bgcolor="LightSteelBlue",
+        x=0.98)
+        )
+
+    fig.show()
+
+
+def auc_cross_val(pred: list, test_list: list):
+
+    fig, ax = plt.subplots(figsize=(6, 6))
+
+    for fold, (y_test, y_pred) in enumerate(zip(test_list, pred)):
+    
+        viz = RocCurveDisplay.from_predictions(
+            y_test,
+            y_pred, 
+            name=f"ROC fold {fold}",
+            alpha=0.3,
+            lw=1,
+            ax=ax,
+            plot_chance_level=(fold == n_splits - 1),
+        )
+        interp_tpr = np.interp(mean_fpr, viz.fpr, viz.tpr)
+        interp_tpr[0] = 0.0
+        tprs.append(interp_tpr)
+        aucs.append(viz.roc_auc)
+
+    
+    mean_tpr = np.mean(tprs, axis=0)
+    mean_tpr[-1] = 1.0
+    mean_auc = auc(mean_fpr, mean_tpr)
+    std_auc = np.std(aucs)
+    ax.plot(
+        mean_fpr,
+        mean_tpr,
+        color="b",
+        label=r"Mean ROC (AUC = %0.2f $\pm$ %0.2f)" % (mean_auc, std_auc),
+        lw=2,
+        alpha=0.8,
+    )
+
+    std_tpr = np.std(tprs, axis=0)
+    tprs_upper = np.minimum(mean_tpr + std_tpr, 1)
+    tprs_lower = np.maximum(mean_tpr - std_tpr, 0)
+    ax.fill_between(
+        mean_fpr,
+        tprs_lower,
+        tprs_upper,
+        color="grey",
+        alpha=0.2,
+        label=r"$\pm$ 1 std. dev.",
+    )
+
+    ax.set(
+        xlim=[-0.05, 1.05],
+        ylim=[-0.05, 1.05],
+        xlabel="False Positive Rate",
+        ylabel="True Positive Rate",
+        title=f"Mean ROC curve with variability\n(Positive label '{target_names[1]}')",
+    )
+    ax.axis("square")
+    ax.legend(loc="lower right")
+    plt.show()
