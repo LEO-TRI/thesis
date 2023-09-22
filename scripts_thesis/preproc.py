@@ -10,7 +10,7 @@ sc = SpacyClean()
 
 def column_selector(df: pd.DataFrame) -> list:
     """
-    A convenience function used to determine which columns to drop from the dataset. 
+    A convenience function used to determine which columns to drop from the dataset.
 
     Parameters
     ----------
@@ -184,7 +184,7 @@ def clean_variables_features(df: pd.DataFrame, features: [str] = None, train_set
     df["has_host_about"] = np.where(df["host_about"].map(lambda row : len(row)>20), 1, 0)
     df["host_about"] = cd.clean_vec(df["host_about"].values)
     df["host_about"] = sc.preprocess_spacy(df["host_about"].values)
-    
+
     if features is None:
         features = ["host_is_superhost", "host_identity_verified",
             "accommodates", "beds", "price", "number_of_reviews",

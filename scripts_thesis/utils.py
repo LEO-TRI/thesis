@@ -44,7 +44,7 @@ def table_color(data:pd.Series, palette_min: int=145, palette_up: int=300, n: in
     Returns
     -------
     list
-        Returns a list of the size of data and with each element being a color hexacode 
+        Returns a list of the size of data and with each element being a color hexacode
     """
     hex_colors = [mcolors.to_hex(color) for color in sns.diverging_palette(palette_min, palette_up, s=60, n=n)]
     hex_colors.reverse()
@@ -78,15 +78,15 @@ def get_top_features(model, has_selector: bool= True, top_n: int= 25, how: str= 
     Parameters
     ----------
     model : imblearn.pipeline.Pipeline or sklearn.pipeline.Pipeline
-        The model must have 4 elements: 
+        The model must have 4 elements:
 
             vectoriser : sklearn.feature_extraction.text.TfidfVectorizer
                 The sklearn vectoriser used to transform strings into words
 
             clf : sklearn.linear_model.LogisticRegression
-                The sklearn predictor used to classify the data 
+                The sklearn predictor used to classify the data
 
-            ohe: sklearn.preprocessing.OneHotEncoder      
+            ohe: sklearn.preprocessing.OneHotEncoder
                 The sklearn preprocessor for categorical data
 
             selector : sklearn.feature_selection.SelectKBest, optional
@@ -100,7 +100,7 @@ def get_top_features(model, has_selector: bool= True, top_n: int= 25, how: str= 
     Returns
     -------
     pd.DataFrame
-        Output dataframe with rows being each one of the top_n most important coef with its respective value 
+        Output dataframe with rows being each one of the top_n most important coef with its respective value
     """
 
     vectoriser = model["preprocessor"].get_params().get("transformers")[1][1]
@@ -123,7 +123,7 @@ def get_top_features(model, has_selector: bool= True, top_n: int= 25, how: str= 
 
     if has_selector:
         features = features[selector.get_support()]
-        
+
     axis_names = [f'feature_{x + 1}' for x in range(top_n)]
 
     if len(clf.classes_) > 2:
@@ -148,7 +148,7 @@ def get_top_features(model, has_selector: bool= True, top_n: int= 25, how: str= 
 
     return df_lambda
 
-  
+
 def plot_confusion_matrix(y_true: np.array, y_pred: np.array, width= 400, height= 400) -> px.imshow:
     """
     Convenience function to print a confusion matrix with the predicted results y_pred
@@ -156,7 +156,7 @@ def plot_confusion_matrix(y_true: np.array, y_pred: np.array, width= 400, height
     Parameters
     ----------
     y_true : np.array
-        Array of real data 
+        Array of real data
     y_pred : np.array
         Array of predicted data
     width : int, optional
@@ -167,7 +167,7 @@ def plot_confusion_matrix(y_true: np.array, y_pred: np.array, width= 400, height
     Returns
     -------
     px.imshow
-        A confusion matrix of the model's result 
+        A confusion matrix of the model's result
     """
     labels = sorted(list(set(y_true)))
     df_lambda = pd.DataFrame(
@@ -255,7 +255,7 @@ def model_explainer(df: pd.DataFrame, x: str= "coef", y: str= "feature")-> px.ba
 
 def model_dl_examiner(train: np.ndarray, val: np.ndarray) -> go.Figure:
     """
-    A convenience function to produce the train and val loss for a trained TF model 
+    A convenience function to produce the train and val loss for a trained TF model
 
     Parameters
     ----------
@@ -280,11 +280,11 @@ def model_dl_examiner(train: np.ndarray, val: np.ndarray) -> go.Figure:
         fig.add_trace(
             go.Scatter(x=x, y=line, mode='lines', name=name, marker_color = color)
             )
-    
+
     fig.update_layout(
         xaxis=dict(title='Epochs'),
         yaxis=dict(title='Loss: Binary cross-entropy'),
-        title="Train and val losses across epochs", 
+        title="Train and val losses across epochs",
         legend=dict(
         orientation="v",
         yanchor="bottom",
@@ -297,15 +297,35 @@ def model_dl_examiner(train: np.ndarray, val: np.ndarray) -> go.Figure:
     fig.show()
 
 
-def auc_cross_val(pred: list, test_list: list):
+def auc_cross_val(pred: list, test_list: list, n_splits: int= 5):
+    """
+    _summary_
+
+    Parameters
+    ----------
+    pred : list
+        _description_
+    test_list : list
+        _description_
+    n_splits : int, optional
+        _description_, by default 5
+    """
+
+
+    fig, ax = plt.subplots(figsize=(6, 6))
+
+
+    tprs = []
+    aucs = []
+    mean_fpr = np.linspace(0, 1, 100)
 
     fig, ax = plt.subplots(figsize=(6, 6))
 
     for fold, (y_test, y_pred) in enumerate(zip(test_list, pred)):
-    
+
         viz = RocCurveDisplay.from_predictions(
             y_test,
-            y_pred, 
+            y_pred,
             name=f"ROC fold {fold}",
             alpha=0.3,
             lw=1,
@@ -317,7 +337,7 @@ def auc_cross_val(pred: list, test_list: list):
         tprs.append(interp_tpr)
         aucs.append(viz.roc_auc)
 
-    
+
     mean_tpr = np.mean(tprs, axis=0)
     mean_tpr[-1] = 1.0
     mean_auc = auc(mean_fpr, mean_tpr)

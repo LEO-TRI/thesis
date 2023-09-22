@@ -29,14 +29,14 @@ scoring = ['accuracy', 'precision', 'recall', 'f1']
 
 def print_results(y_test: np.ndarray, y_pred: np.ndarray) -> dict:
     """
-    Convenience function used to quickly compute and display the evaluation metrics of a model. 
-    Can be used after getting y_pred from a trained model. 
+    Convenience function used to quickly compute and display the evaluation metrics of a model.
+    Can be used after getting y_pred from a trained model.
     Retuurns a dictionnary with 4 metrics and their corresponding values.
 
     Parameters
     ----------
     y_test : np.ndarray
-        Array of the real values 
+        Array of the real values
     y_pred : np.ndarray
         Array of the predicted values
 
@@ -64,7 +64,7 @@ def print_results(y_test: np.ndarray, y_pred: np.ndarray) -> dict:
 
 def baseline_model(y: np.ndarray, test_split: float=0.3) -> np.ndarray:
     """
-    Function computing the baseline to beat by the new model. 
+    Function computing the baseline to beat by the new model.
     Produces two baseline, one coming from a random guess and the other from predicting only the majority class
 
     Parameters
@@ -77,7 +77,7 @@ def baseline_model(y: np.ndarray, test_split: float=0.3) -> np.ndarray:
     Returns
     -------
     np.ndarray
-        Array of predicted results. 
+        Array of predicted results.
     """
 
     print(Fore.MAGENTA + "\n ⭐️ Results to beat" + Style.RESET_ALL)
@@ -90,17 +90,17 @@ def baseline_model(y: np.ndarray, test_split: float=0.3) -> np.ndarray:
     print(Fore.BLUE + "\n Result for majority baseline" + Style.RESET_ALL)
     y_majority = np.zeros(len(y_test))
     print_results(y_test, y_majority)
-    
+
     return y_random, y_majority
 
 
-def build_pipeline(numeric_cols:list[str], text_cols:list[str], other_cols:list[str], 
+def build_pipeline(numeric_cols:list[str], text_cols:list[str], other_cols:list[str],
                    description:str='description', amenities:str='amenities', host:str="host_about",
                    max_features: int=1000, max_features_tfidf: int=10000, max_kbest: int=1000) -> Pipeline:
     """
     A convenience function created to quickly build a pipeline. Requires the columns' names for the column transformer.
     Pipeline takes a cleaned dataset.
-    Pipeline does the preprocessing, the balancing of the classes and instantiate a sklearn's model. 
+    Pipeline does the preprocessing, the balancing of the classes and instantiate a sklearn's model.
     Returns the pipeline.
 
     Parameters
@@ -124,7 +124,7 @@ def build_pipeline(numeric_cols:list[str], text_cols:list[str], other_cols:list[
         ('imputer', IterativeImputer(random_state=1830)),
         ('scaler', RobustScaler())
     ])
-    
+
     num_transformer = ColumnTransformer(
         transformers=[
             ('num', numeric_transformer, numeric_cols),
@@ -146,7 +146,7 @@ def build_pipeline(numeric_cols:list[str], text_cols:list[str], other_cols:list[
         ('selectkbest', SelectKBest(chi2, k=max_kbest))
         ]
                          )
-    
+
     cat_transformer = ColumnTransformer(
         transformers=[
             ('cat', OneHotEncoder(), other_cols)
@@ -170,12 +170,12 @@ def build_pipeline(numeric_cols:list[str], text_cols:list[str], other_cols:list[
                                 random_state = 1830, solver = 'newton-cg', max_iter = 100))
         ]
                         )
-    
+
     return pipeline
 
 
 def train_model(X: pd.DataFrame, y: np.ndarray, test_split: float=0.3, max_features: int=1000, n_splits: int = 5) -> Pipeline:
-    """ 
+    """
     Fit the passed model with the passed data and return a tuple (fitted_model, history)
 
     Parameters
@@ -196,7 +196,7 @@ def train_model(X: pd.DataFrame, y: np.ndarray, test_split: float=0.3, max_featu
     Pipeline : imblearn.pipeline.Pipeline/sklearn.pipeline.Pipeline
         A fitted pipeline object
     res : pd.DataFrame
-        A dataframe with the mean cross-validated metrics (4 in total) 
+        A dataframe with the mean cross-validated metrics (4 in total)
     """
 
     numeric_cols = X.select_dtypes(include=[np.number]).columns
@@ -209,28 +209,19 @@ def train_model(X: pd.DataFrame, y: np.ndarray, test_split: float=0.3, max_featu
 
     cv = RepeatedStratifiedKFold(n_splits=n_splits, n_repeats=2, random_state=42)
 
-
-    tprs = []
-    aucs = []
     res = []
-
     pred_list = []
     test_list = []
-
-    mean_fpr = np.linspace(0, 1, 100)
-
-    fig, ax = plt.subplots(figsize=(6, 6))
-
 
     for fold, (train, test) in enumerate(cv.split(X, y)):
         pipe_model.fit(X[train], y[train])
         y_pred = pipe_model.predict(X[test])
 
         res.append(print_results(y[test], y_pred))
-        pred_list.append(y_pred) 
+        pred_list.append(y_pred)
         test_list.append(y[test])
 
-    
+
 
 
 
@@ -258,7 +249,7 @@ def evaluate_model(model, X: pd.DataFrame, y: pd.Series, test_split:float=0.3) -
     Parameters
     ----------
     model : object
-        A sklearn model, instantiated from a pickle file or trained before. 
+        A sklearn model, instantiated from a pickle file or trained before.
     X : pd.DataFrame
         The dataframe of features
     y : pd.Series/np.ndarray
@@ -275,7 +266,7 @@ def evaluate_model(model, X: pd.DataFrame, y: pd.Series, test_split:float=0.3) -
     y_test: np.ndarray
         A np.array of the real data
     """
-    
+
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_split, random_state=42, stratify=y)
 
     print(Fore.BLUE + f"\nEvaluating model on {len(X_test)} rows..." + Style.RESET_ALL)

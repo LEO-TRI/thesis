@@ -11,7 +11,7 @@ from scripts_thesis.params import *
 
 class GraphLoader:
     """
-    Convenience class used to load the dataset used for graph representation at different 
+    Convenience class used to load the dataset used for graph representation at different
     levels of processing.
     """
 
@@ -128,7 +128,7 @@ class DataLoader:
 
     def load_folder(self) -> [pd.DataFrame]:
         """
-        A function to faciliate iterations over all available csvs in a given folder 
+        A function to faciliate iterations over all available csvs in a given folder
 
         Returns
         -------
@@ -211,11 +211,11 @@ class DataLoader:
             return None #Used to exit the function
 
         return data_processed
-    
+
     def prep_data(self, file_name: str=None, target: str = "license") -> tuple[pd.DataFrame, pd.Series]:
         """
-        A convenience function leveraging load_processed_data in the same class to provide additional processing. 
-        
+        A convenience function leveraging load_processed_data in the same class to provide additional processing.
+
         Exists to avoid cluttering main.py
 
         Parameters
@@ -228,7 +228,7 @@ class DataLoader:
         Returns
         -------
         tuple[pd.DataFrame, pd.Series]
-            A tuple containing the pd.DataFrame X of features and the pd.Series y of the target 
+            A tuple containing the pd.DataFrame X of features and the pd.Series y of the target
         """
         df = self.load_processed_data(file_name=file_name)
         if df is None: #Used to exit the function and trigger an error if load_processed_data fails

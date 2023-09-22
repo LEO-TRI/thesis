@@ -6,6 +6,9 @@ import spacy_fastlang
 from spacy.language import Language
 from tqdm import tqdm
 
+import nltk
+from nltk.corpus import stopwords
+
 class SpacyClean:
 
     def __init__(self):
@@ -27,15 +30,15 @@ class SpacyClean:
         Parameters
         ----------
         alpha : array_like
-            A text column of a pd.DataFrame. Each cell must be a string. I 
+            A text column of a pd.DataFrame. Each cell must be a string. I
 
         Returns
         -------
         docs : np.array
-            An array of strings, each string being a text cleaned according to the method. 
-        
+            An array of strings, each string being a text cleaned according to the method.
+
         mask: np.array
-            An array of ints, each number being an indice. Used to track which texts weren't in French or English and drop them later.  
+            An array of ints, each number being an indice. Used to track which texts weren't in French or English and drop them later.
         """
         docs = list()
         mask = list()
@@ -62,13 +65,13 @@ class CleanData:
     """
     A class centralising all the cleaning functions for text
     """
-        
+
     def __init__(self):
         self.french_stopwords = stopwords.words("french")
         self.translator_p = str.maketrans(string.punctuation, ' '*len(string.punctuation))
         self.translator_d = str.maketrans('', '', string.digits)
 
-        #The class' methods, but in vectorized format for increased speed. 
+        #The class' methods, but in vectorized format for increased speed.
         #Can now be passed directly with the format clean_vec(array_like)
         self.clean_vec = np.vectorize(self.clean)
         self.clean_price_vec = np.vectorize(self.clean_price)
@@ -91,7 +94,7 @@ class CleanData:
 
 
     def clean(self, text: str) -> str:
-        """Simple cleaning function. To be used with a .map or vectorized. 
+        """Simple cleaning function. To be used with a .map or vectorized.
 
         Parameters
         ----------
