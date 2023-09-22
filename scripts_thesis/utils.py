@@ -63,16 +63,26 @@ def custom_combiner(feature, category):
 
 
 def get_top_features(model, has_selector: bool = True, top_n: int = 25, how: str = 'long') -> pd.DataFrame:
-    """Convenience function to extract top_n predictor per class from a model.
+    """
+    Convenience function to extract top_n predictor per class from a model.
 
     Parameters
     ----------
-    vectoriser : _type_
-        The sklearn vectoriser used to transform strings into words
-    clf : _type_
-        The sklearn model used to classify the data 
-    selector : _type_, optional
-        The selector used to reduce the number of features, by default None
+    model : imblearn.pipeline.Pipeline or sklearn.pipeline.Pipeline
+        The model must have 4 elements: 
+
+            vectoriser : sklearn.feature_extraction.text.TfidfVectorizer
+                The sklearn vectoriser used to transform strings into words
+
+            clf : sklearn.linear_model.LogisticRegression
+                The sklearn predictor used to classify the data 
+
+            ohe: sklearn.preprocessing.OneHotEncoder      
+                The sklearn preprocessor for categorical data
+
+            selector : sklearn.feature_selection.SelectKBest, optional
+                The sklearn selector used to reduce the number of features, by default None
+
     top_n : int, optional
         Number of top features to return, by default 25
     how : str, optional

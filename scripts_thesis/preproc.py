@@ -18,7 +18,7 @@ def column_selector(df: pd.DataFrame) -> list:
 
     Returns
     -------
-    list
+    drop_list : list
         A list of column names
     """
     df_summary = df.describe(include="all").transpose()

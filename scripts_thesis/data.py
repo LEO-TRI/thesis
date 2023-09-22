@@ -175,3 +175,7 @@ class DataLoader:
             return None #Used to exit the function
 
         return data_processed
+
+class LoadDataMixin():
+    def load_raw_data(self):
+        return super().load_raw_data()
