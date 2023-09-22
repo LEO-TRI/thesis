@@ -6,10 +6,9 @@ from sklearn.model_selection import train_test_split, cross_validate, RepeatedSt
 from sklearn.metrics import accuracy_score, precision_score, f1_score, recall_score, classification_report
 from sklearn.linear_model import LogisticRegression, SGDClassifier
 from sklearn.feature_selection import SelectKBest, chi2
-from sklearn.preprocessing import RobustScaler, OneHotEncoder, FunctionTransformer
-#from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import RobustScaler, OneHotEncoder
+from sklearn.pipeline import FeatureUnion
 from sklearn.compose import ColumnTransformer
-
 
 import pandas as pd
 import numpy as np
@@ -27,13 +26,6 @@ import os
 import pickle
 
 scoring = ['accuracy', 'precision', 'recall', 'f1']
-
-def to_arr(x):
-    return x.toarray()
-
-def under_sampling(x):
-    return x.toarray()
-
 
 def print_results(y_test: np.array, y_pred: np.array) -> dict:
     metrics = [np.round(accuracy_score(y_test, y_pred), 2),
@@ -69,44 +61,59 @@ def baseline_model(y: np.array,
     y_baseline = np.zeros(len(y_test))
     print_results(y_test, y_baseline)
 
-def build_pipeline(numeric_cols:[str], text_cols:[str], other_cols:[str], max_features:int=1000):
+def build_pipeline(numeric_cols:[str], other_cols:[str],
+                   description:str='description', amenities:str='amenities', host:str="host_about",
+                   max_features_tfidf:int=10000, max_kbest:int=1000):
 
     numeric_transformer = Pipeline(steps=[
-        ('imputer', IterativeImputer(random_state=42)),
+        ('imputer', IterativeImputer(random_state=1830)),
         ('scaler', RobustScaler())
     ])
 
-    text_transformer = Pipeline(steps=[
-        ('tfidf', TfidfVectorizer(max_features=max_features, ngram_range = (1, 3), max_df=0.8, norm="l2"))
-    ])
+    text_transformers = ColumnTransformer(
+        transformers=[
+            ('text', TfidfVectorizer(max_features=max_features_tfidf), description),
+            ('text2', TfidfVectorizer(max_features=max_features_tfidf), amenities),
+            ('text3', TfidfVectorizer(max_features=max_features_tfidf), host)
+            ],
+        remainder='drop'  # Pass through any other columns not specified
+        )
 
-    other_transformer = Pipeline(steps=[
-        ('onehot', OneHotEncoder(drop='first', sparse_output=False, feature_name_combiner=custom_combiner))
-    ])
+    text_pipe = Pipeline([
+        ('text_preprocessing', text_transformers),
+        ('selectkbest', SelectKBest(chi2, k=max_kbest))
+        ]
+                         )
 
-    preprocessor = ColumnTransformer(
+    num_transformer = ColumnTransformer(
         transformers=[
             ('num', numeric_transformer, numeric_cols),
-            ('text', text_transformer, text_cols),
-            ('other', other_transformer, other_cols)
-        ])
+            ('neighbourhood', OneHotEncoder(), other_cols)
+        ],
+        remainder='drop'  # Pass through any other columns not specified
+    )
 
-    pipeline = Pipeline(steps=[("balancing", RandomUnderSampler(random_state=1830))
-                               ('preprocessor', preprocessor),
-                               #('smote', SMOTE(random_state=42, k_neighbors=20)),
-                               ('selector', SelectKBest(chi2, k = 2000)),
-                               ('clf', LogisticRegression(penalty = 'l2', C = .9,
-                                multi_class = 'multinomial', class_weight = 'balanced',
-                                random_state = 42, solver = 'newton-cg', max_iter = 100))
-                               ])
+    column_transformer = FeatureUnion([("text", text_pipe),
+                                    ("num", num_transformer)])
+
+    # Create the final pipeline
+    pipeline = Pipeline([
+        ("balancing", RandomUnderSampler(random_state=1830)),
+        ('preprocessing', column_transformer),
+        ('classifier', LogisticRegression(penalty = 'l2', C = .9,
+                                multi_class = 'auto', class_weight = 'balanced',
+                                random_state = 1830, solver = 'newton-cg', max_iter = 100))
+        ]
+                        )
 
     return pipeline
+
 
 def train_model(
         X: pd.DataFrame,
         y: np.array,
         test_split: float=0.3,
-        max_features: int=1000
+        max_features: int=10000
     ):
     """
     Fit the model and return a tuple (fitted_model, history)
@@ -114,10 +121,10 @@ def train_model(
     """
 
     numeric_cols = X.select_dtypes(include=[np.number]).columns
-    text_cols = ["description", "amenities"]
+    text_cols = ["amenities", "description", "host_about"]
     other_cols = list(set(X.columns) - set(numeric_cols) - set(text_cols))
 
-    pipe_model = build_pipeline(numeric_cols, text_cols, other_cols, max_features = max_features)
+    pipe_model = build_pipeline(numeric_cols, other_cols, max_features_tfidf = max_features)
 
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_split, random_state=42, stratify=y)
 

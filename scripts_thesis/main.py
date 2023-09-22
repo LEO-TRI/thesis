@@ -8,7 +8,7 @@ from colorama import Fore, Style
 
 from scripts_thesis.data import load_raw_data, load_processed_data
 from scripts_thesis.model_ML import train_model, evaluate_model, predict_model, load_model
-#from scripts_thesis.cleaning import clean_predict
+from scripts_thesis.utils import get_top_features, plot_confusion_matrix, sdg_explainer
 from scripts_thesis.params import *
 from scripts_thesis.preproc import *
 
@@ -87,8 +87,8 @@ def train(file_name:str = None,
     if data_processed is None: #Used to exit the function and trigger an error if load_processed_data fails
         return None
 
-    y= data_processed[target].astype(int)
-    X = data_processed.drop(columns=[target])
+    X= data_processed.drop(columns=["license"])
+    y = data_processed["license"]
 
     print(Fore.BLUE + "\nTraining model..." + Style.RESET_ALL)
     model, res = train_model(X, y, test_split)
@@ -172,24 +172,21 @@ def pred(X_pred:pd.DataFrame = None) -> np.array:
     model = load_model()
     assert model is not None
 
-    #X_pred = clean_predict(X_pred)
+    X_pred = clean_variables_features(X_pred, train_set=False)
     y_pred, y_pred_proba = predict_model(model, X_pred)
 
-    sdg_dict = DataProcess().sdg
-    sdg_dict = {int(key): value for key, value in sdg_dict.items()}
-
-    print("\n✅ prediction done: ", y_pred, [sdg_dict[pred] for pred in y_pred], y_pred.shape, "\n")
+    print("\n✅ prediction done: ", y_pred, y_pred.shape, "\n")
     print("\n✅ Proba: ", y_pred_proba, "\n")
     return y_pred
 
 
 if __name__ == '__main__':
     #agreement, target = main()
-    local_setup()
+    #local_setup()
     print("✅ Setup done")
-    preprocess()
+    #preprocess()
     print("✅ Process done")
-    #train(target=target)
+    train()
     print("✅ Train done")
     #model_viz()
     print("✅ Viz created")

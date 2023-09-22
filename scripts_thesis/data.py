@@ -116,7 +116,6 @@ class GraphLoader:
 
 ###Methods for predictive parts####
 
-###Cleaning raw data###
 def load_folder(path: str) -> [pd.DataFrame]:
     files = glob.glob(path + '/*.csv.gz')
     for f in files:
