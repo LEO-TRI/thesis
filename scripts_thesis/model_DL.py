@@ -71,7 +71,7 @@ X_test = preprocess_dl_text()
 
 class NeuralModel:
 
-    def __init__(self, embedding_dims: int = 200) -> None:
+    def __init__(self, embedding_dims: int= 200) -> None:
         self.embedding_dims = embedding_dims
 
     def build_model(self) -> tf.keras.Model:

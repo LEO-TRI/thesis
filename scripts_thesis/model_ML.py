@@ -3,7 +3,8 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.experimental import enable_iterative_imputer
 from sklearn.impute import IterativeImputer
 from sklearn.model_selection import train_test_split, cross_validate, RepeatedStratifiedKFold
-from sklearn.metrics import accuracy_score, precision_score, f1_score, recall_score, classification_report
+from sklearn.metrics import accuracy_score, precision_score, f1_score, recall_score, classification_report, RocCurveDisplay, auc
+
 from sklearn.linear_model import LogisticRegression, SGDClassifier
 from sklearn.feature_selection import SelectKBest, chi2
 from sklearn.preprocessing import RobustScaler, OneHotEncoder
@@ -151,7 +152,7 @@ def build_pipeline(numeric_cols:[str], text_cols:[str], other_cols:[str], max_fe
     return pipeline
 
 
-def train_model(X: pd.DataFrame, y: np.ndarray, test_split: float=0.3, max_features: int=1000) -> Pipeline:
+def train_model(X: pd.DataFrame, y: np.ndarray, test_split: float=0.3, max_features: int=1000, n_splits: int = 5) -> Pipeline:
     """ 
     Fit the passed model with the passed data and return a tuple (fitted_model, history)
 
@@ -162,13 +163,15 @@ def train_model(X: pd.DataFrame, y: np.ndarray, test_split: float=0.3, max_featu
     y : np.ndarray
         The target variable
     test_split : float, optional
-        _description_, by default 0.3
+        The split between train and test samples, by default 0.3
     max_features : int, optional
-        _description_, by default 1000
+        The max number of features for the tfidf vectorizer, by default 1000
+    n_splits : int, optional
+        The number of folds for the cross-val
 
     Returns
     -------
-    Pipeline
+    Pipeline : imblearn.pipeline.Pipeline/sklearn.pipeline.Pipeline
         A fitted pipeline object
     res : pd.DataFrame
         A dataframe with the mean cross-validated metrics (4 in total) 
@@ -180,11 +183,39 @@ def train_model(X: pd.DataFrame, y: np.ndarray, test_split: float=0.3, max_featu
 
     pipe_model = build_pipeline(numeric_cols, text_cols, other_cols, max_features = max_features)
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_split, random_state=42, stratify=y)
-
     print(Fore.BLUE + "\nLaunching CV" + Style.RESET_ALL)
 
-    cv = RepeatedStratifiedKFold(n_splits=5, n_repeats=2, random_state=42)
+    cv = RepeatedStratifiedKFold(n_splits=n_splits, n_repeats=2, random_state=42)
+
+
+    tprs = []
+    aucs = []
+    res = []
+
+    pred_list = []
+    test_list = []
+
+    mean_fpr = np.linspace(0, 1, 100)
+
+    fig, ax = plt.subplots(figsize=(6, 6))
+
+
+    for fold, (train, test) in enumerate(cv.split(X, y)):
+        pipe_model.fit(X[train], y[train])
+        y_pred = pipe_model.predict(X[test])
+
+        res.append(print_results(y[test], y_pred))
+        pred_list.append(y_pred) 
+        test_list.append(y[test])
+
+    
+
+
+
+
+
+
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_split, random_state=1830, stratify=y)
     res = cross_validate(pipe_model, X_train, y_train, verbose=2, cv=cv, scoring=scoring)
     res = pd.DataFrame(res)
 
