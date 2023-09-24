@@ -51,14 +51,14 @@ class SpacyClean:
                         tokens.append(token.lemma_)
                 docs.append(' '.join(tokens))
                 mask.append(ind)
-            elif doc._.language == "fr":
+            else:
                 for token in self.nlp_fr(doc.text):
                     if token.pos_ in ['NOUN', 'VERB', 'ADJ']:
                         tokens.append(token.lemma_)
                 docs.append(' '.join(tokens))
                 mask.append(ind)
 
-        return np.array(docs), mask
+        return docs
 
 
 class CleanData:
@@ -113,7 +113,7 @@ class CleanData:
         return " ".join(text.split())
 
 
-    def clean_price(text: str) -> float:
+    def clean_price(self, text: str) -> float:
         """Function used to transform the price column from string to number.
         The function removes the dollar sign and rework the , vs . separating scheme.
 

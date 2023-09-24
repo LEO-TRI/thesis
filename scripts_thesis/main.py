@@ -8,7 +8,7 @@ from colorama import Fore, Style
 
 from scripts_thesis.data import DataLoader, LoadDataMixin
 from scripts_thesis.model_ML import train_model, evaluate_model, predict_model, load_model
-from scripts_thesis.utils import get_top_features, model_explainer, plot_confusion_matrix
+from scripts_thesis.utils import get_top_features, model_explainer, plot_confusion_matrix, auc_cross_val
 
 from scripts_thesis.params import *
 from scripts_thesis.preproc import *
@@ -52,7 +52,7 @@ class ModelFlow(LoadDataMixin, DataLoader):
         super().__init__() #Brings back load_raw_data. Used as a test for mixin
 
 
-    def preprocess(self, model: bool=True) -> pd.DataFrame:
+    def preprocess(self, has_model: bool=True) -> pd.DataFrame:
         """
         Load the raw data from the raw_data folder.\n
         Save the data locally if not in the raw data folder.\n
@@ -62,7 +62,7 @@ class ModelFlow(LoadDataMixin, DataLoader):
 
         Parameters
         ----------
-        model : bool, optional
+        has_model : bool, optional
             Additional preprocessing steps are taken if True, by default True
 
         Returns
@@ -78,8 +78,9 @@ class ModelFlow(LoadDataMixin, DataLoader):
         df = self.load_raw_data() #Brings back load_raw_data. Used as a test for mixin
 
         data_clean = preprocess_data(df)
+        #data_clean = data_clean.sample(frac=0.1)
 
-        if model:
+        if has_model:
             data_clean = clean_target_feature(data_clean)
             data_clean = clean_variables_features(data_clean)
 
@@ -119,21 +120,38 @@ class ModelFlow(LoadDataMixin, DataLoader):
         print(Fore.MAGENTA + "\n⭐️ Use case: train" + Style.RESET_ALL)
         print(Fore.BLUE + "\nLoading preprocessed validation data..." + Style.RESET_ALL)
 
-        X, y = DataLoader.prep_data(file_name=file_name)
+        X, y = DataLoader().prep_data(file_name=file_name, target=target)
         if X is None: #Used to exit the function and trigger an error if load_processed_data fails
             return None
 
         print(Fore.BLUE + "\nTraining model..." + Style.RESET_ALL)
-        model, res = train_model(X, y, test_split)
+        model, results, auc_metrics = train_model(X, y, test_split) #auc_metrics = (test_list, pred_list)
+
+        auc_cross_val(auc_metrics[0], auc_metrics[1])
+
 
         model_iteration = len(os.listdir(LOCAL_MODEL_PATH)) + 1
+
         file_name = f'model_V{model_iteration}.pkl'
         full_file_path = os.path.join(LOCAL_MODEL_PATH, file_name)
         pickle.dump(model, open(full_file_path, 'wb'))
 
         file_name = f'model_train_V{model_iteration}'
         full_file_path = os.path.join(LOCAL_RESULT_PATH, file_name)
-        res.to_csv(full_file_path)
+        results.to_csv(full_file_path)
+
+    def optimise(file_name: str = None, target: str = "license", test_split: float = 0.):
+
+        print(Fore.MAGENTA + "\n⭐️ Use case: optimise" + Style.RESET_ALL)
+        print(Fore.BLUE + "\nLoading preprocessed validation data..." + Style.RESET_ALL)
+
+        X, y = DataLoader().prep_data(file_name=file_name, target=target)
+        if X is None: #Used to exit the function and trigger an error if load_processed_data fails
+            return None
+
+        print(Fore.BLUE + "\nTraining model..." + Style.RESET_ALL)
+
+
 
     def evaluate(file_name: str = None, target: str = "license") -> pd.DataFrame:
         """
@@ -229,7 +247,7 @@ class ModelFlow(LoadDataMixin, DataLoader):
 
 if __name__ == '__main__':
     #agreement, target = main()
-    #local_setup()
+    local_setup()
     print("✅ Setup done")
     ml = ModelFlow()
     ml.pred_data = ml.preprocess() #Used to keep some prediction data unseen by the model

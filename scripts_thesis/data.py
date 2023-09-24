@@ -126,21 +126,29 @@ class DataLoader:
     def __init__(self, path: str = LOCAL_RAW_PATH):
         self.path = path
 
-    def load_folder(self) -> [pd.DataFrame]:
+    def load_folder(self, path: str = None) -> [pd.DataFrame]:
         """
         A function to faciliate iterations over all available csvs in a given folder
+
+        Parameters
+        ----------
+        path : str, optional
+            The path to the directory with the raw data, if None defaults to the LOCAL_RAW_DATA_PATH, by default None
 
         Returns
         -------
         [pd.DataFrame]
-            AA list of pd.DataFrame
+            A list of pd.DataFrame
 
         Yields
         ------
         Iterator[[pd.DataFrame]]
             One instance of the processed dataframe. Yields 1 by iteration over the list of csv files
         """
-        files = glob.glob(self.path + '/*.csv.gz')
+        if path is None:
+            path = self.path
+
+        files = glob.glob(path + '/*.csv.gz')
         for f in files:
                 # get filename
                 stock = os.path.basename(f)
@@ -163,12 +171,13 @@ class DataLoader:
         pd.DataFrame
             The full pd.DataFrame of raw data
         """
-        if len(os.listdir())>0:
+        if len(os.listdir(self.path))>0:
             li = [df for df in self.load_folder()]
 
         else:
             full_file_path = os.path.join(os.getcwd(), "data")
             li = [df for df in self.load_folder(full_file_path)]
+
 
         return pd.concat(li)
 
@@ -210,9 +219,9 @@ class DataLoader:
             print("❌ Not enough processed data retrieved to train on")
             return None #Used to exit the function
 
-        return data_processed
+        return data_processed.reset_index(drop=True)
 
-    def prep_data(self, file_name: str=None, target: str = "license") -> tuple[pd.DataFrame, pd.Series]:
+    def prep_data(self, file_name: str= None, target: str= "license") -> tuple[pd.DataFrame, pd.Series]:
         """
         A convenience function leveraging load_processed_data in the same class to provide additional processing.
 
