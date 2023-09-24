@@ -7,8 +7,8 @@ import pickle
 from colorama import Fore, Style
 
 from scripts_thesis.data import DataLoader, LoadDataMixin
-from scripts_thesis.model_ML import train_model, evaluate_model, predict_model, load_model
-from scripts_thesis.utils import get_top_features, model_explainer, plot_confusion_matrix, auc_cross_val
+from scripts_thesis.model_ML import train_model, evaluate_model, predict_model, load_model, tune_model
+from scripts_thesis.utils import get_top_features, model_explainer, plot_confusion_matrix, auc_cross_val, params_extracter
 
 from scripts_thesis.params import *
 from scripts_thesis.preproc import *
@@ -101,7 +101,7 @@ class ModelFlow(LoadDataMixin, DataLoader):
         return data_clean_pred
 
     #####MODEL#####
-    def train(file_name: str = None, target: str = "license", test_split: float = 0.3) -> None:
+    def train(self, file_name: str = None, target: str = "license", test_split: float = 0.3) -> None:
         """
         Load data from the data folder.\n
         Train the instantiated model on the train set.\n
@@ -118,20 +118,16 @@ class ModelFlow(LoadDataMixin, DataLoader):
         """
 
         print(Fore.MAGENTA + "\n⭐️ Use case: train" + Style.RESET_ALL)
-        print(Fore.BLUE + "\nLoading preprocessed validation data..." + Style.RESET_ALL)
+        print(Fore.MAGENTA + "\nLoading preprocessed validation data..." + Style.RESET_ALL)
 
-        X, y = DataLoader().prep_data(file_name=file_name, target=target)
+        X, y = self.prep_data(file_name=file_name, target=target)
         if X is None: #Used to exit the function and trigger an error if load_processed_data fails
             return None
 
-        print(Fore.BLUE + "\nTraining model..." + Style.RESET_ALL)
+        print(Fore.MAGENTA + "\nTraining model..." + Style.RESET_ALL)
         model, results, auc_metrics = train_model(X, y, test_split) #auc_metrics = (test_list, pred_list)
 
-        auc_cross_val(auc_metrics[0], auc_metrics[1])
-
-
         model_iteration = len(os.listdir(LOCAL_MODEL_PATH)) + 1
-
         file_name = f'model_V{model_iteration}.pkl'
         full_file_path = os.path.join(LOCAL_MODEL_PATH, file_name)
         pickle.dump(model, open(full_file_path, 'wb'))
@@ -140,17 +136,59 @@ class ModelFlow(LoadDataMixin, DataLoader):
         full_file_path = os.path.join(LOCAL_RESULT_PATH, file_name)
         results.to_csv(full_file_path)
 
-    def optimise(file_name: str = None, target: str = "license", test_split: float = 0.):
+        file_name = f'auc_curve_{model_iteration}'
+        full_file_path = os.path.join(LOCAL_IMAGE_PATH, file_name)
+        fig =  auc_cross_val(auc_metrics[0], auc_metrics[1])
+        fig.savefig(fname=full_file_path, format="png")
+
+    def optimise(self, file_name: str = None, target: str = "license", classifier: list[str]=None, n_iter: int=50):
+        """
+        A method to perform hyperparameters tuning on several classifiers
+
+        Returns a fitted and optimised classifier
+
+        Parameters
+        ----------
+        file_name : str, optional
+            The file from which to pull the processed data, if None returns the latest file, by default None
+        target : str, optional
+            The name of the column to use as feature, by default "license"
+        classifier : list[str], optional
+            The classifier to use ('logistic', 'gbt', 'random_forest'), if None will test all, by default None
+            Must be passed as a list even if only one is passed.
+
+        Returns
+        -------
+        Pipeline
+            A sklearn pipeline
+        """
 
         print(Fore.MAGENTA + "\n⭐️ Use case: optimise" + Style.RESET_ALL)
-        print(Fore.BLUE + "\nLoading preprocessed validation data..." + Style.RESET_ALL)
+        print(Fore.MAGENTA + "\nLoading preprocessed validation data..." + Style.RESET_ALL)
 
-        X, y = DataLoader().prep_data(file_name=file_name, target=target)
+        X, y = self.prep_data(file_name=file_name, target=target)
         if X is None: #Used to exit the function and trigger an error if load_processed_data fails
             return None
 
-        print(Fore.BLUE + "\nTraining model..." + Style.RESET_ALL)
+        if classifier is None:
+            classifier=["logistic", "gbt", "random_forest"]
 
+        print(Fore.MAGENTA + f"\nTuning {len(classifier)} model(s)..." + Style.RESET_ALL)
+
+        #Test the pipeline with hyperparameters for three potential classifiers
+        tuned_results =  {model: tune_model(X, y, n_iter=n_iter, classifier=model) for model in classifier}
+        tuned_results = {key: [model.best_estimator_, params_extracter(model), model] for key, model in tuned_results.items()}
+        tuned_results = {key: value for key, value in sorted(tuned_results.items(), key= lambda x : x[1][1].get("precision"))}
+
+        print(Fore.MAGENTA + "Results are:" + Style.RESET_ALL)
+        for key in tuned_results.keys():
+            print(f"{key} : {tuned_results.get(key)[1]}")
+            print("With params:")
+            print(tuned_results.get(key)[0])
+
+        best_model_ind = list(tuned_results.keys())[0]
+
+        return tuned_results.get(best_model_ind)[2]
 
 
     def evaluate(file_name: str = None, target: str = "license") -> pd.DataFrame:
