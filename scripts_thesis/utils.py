@@ -6,7 +6,8 @@ import matplotlib.colors as mcolors
 import seaborn as sns
 
 from sklearn.metrics import accuracy_score, f1_score, confusion_matrix, precision_score, RocCurveDisplay, auc
-from scipy import stats
+
+from scipy import stats, sparse
 
 import plotly.express as px
 import plotly.graph_objects as go
@@ -437,3 +438,22 @@ def params_extracter(model: object) -> dict:
     ind = model.cv_results_.get("mean_test_precision").argmax()
     res = [key for key in model.cv_results_.keys() if "mean_test_" in key]
     return {key[10:]: model.cv_results_.get(key)[ind] for key in res} #To remove mean_test_
+
+def sparse_to_dense(X):
+    """
+    Convert a sparse matrix to a dense matrix.
+
+    Parameters
+    ----------
+    X : {array-like, sparse matrix}
+        The input data, which can be either a dense or sparse matrix.
+
+    Returns
+    -------
+    {array-like, numpy.ndarray}
+        A dense matrix if the input is sparse; otherwise, the input is returned unchanged.
+    """
+    if isinstance(X, sparse.csr_matrix):
+        return X.toarray()
+    else:
+        return X

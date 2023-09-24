@@ -2,7 +2,6 @@ import pandas as pd
 import numpy as np
 from thefuzz import fuzz
 from scripts_thesis.cleaning import CleanData, SpacyClean
-from scripts_thesis.data import DataLoader
 from tqdm import tqdm
 
 cd = CleanData()

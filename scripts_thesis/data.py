@@ -256,3 +256,6 @@ class LoadDataMixin():
     """
     def load_raw_data(self):
         return super().load_raw_data()
+
+    def prep_data(self, file_name: str= None, target: str= "license"):
+        return super().prep_data(file_name, target)
