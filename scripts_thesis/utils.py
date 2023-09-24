@@ -6,6 +6,7 @@ import matplotlib.colors as mcolors
 import seaborn as sns
 
 from sklearn.metrics import accuracy_score, f1_score, confusion_matrix, precision_score, RocCurveDisplay, auc
+from scipy import stats
 
 import plotly.express as px
 import plotly.graph_objects as go
@@ -374,3 +375,40 @@ def auc_cross_val(test_array: list, pred_array: list, n_splits: int= 5):
     plt.show()
 
     return fig
+
+def params_combiner(classifier: str="logistic") -> dict:
+    """
+    A convenience function used to create the parameter dictionnary for hyperparameter tuning
+
+    Functions only with RandomizedSearchCV because of the use of scipy.stats
+
+    Parameters
+    ----------
+    classifier : str, optional
+        The classifier used in the pipeline, by default "logistic"
+
+    Returns
+    -------
+    pipe_params : dict
+        A full dictionnary of hyperparameters and potential values
+    """
+    pipe_params = dict(preprocessing__text__selectkbest__k=np.arange(100, 2000 + 1, 100))
+
+    if classifier == "logistic":
+        params_log = dict(classifier__C=stats.uniform(loc=0, scale=5),
+                        classifier__penalty=["l1", "l2"]
+                        )
+        pipe_params.update(params_log)
+
+    elif classifier == "gbt":
+        params_log = dict(classifier__C=stats.uniform(loc=0, scale=5),
+                        classifier__penalty=["l1", "l2"]
+                        )
+        pipe_params.update(params_log)
+    else:
+        params_log = dict(classifier__C=stats.uniform(loc=0, scale=5),
+                        classifier__penalty=["l1", "l2"]
+                        )
+        pipe_params.update(params_log)
+
+    return pipe_params
