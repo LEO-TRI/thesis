@@ -16,7 +16,7 @@ from imblearn.pipeline import Pipeline
 from imblearn.over_sampling import SMOTE
 from imblearn.under_sampling import RandomUnderSampler
 
-from scipy import stats
+
 
 import pandas as pd
 import numpy as np
@@ -24,7 +24,7 @@ import time
 import os
 import pickle
 
-from scripts_thesis.utils import custom_combiner
+from scripts_thesis.utils import custom_combiner, params_combiner
 from scripts_thesis.params import *
 
 from colorama import Fore, Style
@@ -35,8 +35,6 @@ scoring = dict(
     accuracy=make_scorer(accuracy_score),
     precision=make_scorer(precision_score)
     )
-
-
 
 
 def print_results(y_test: np.ndarray, y_pred: np.ndarray, verbose: bool= True, fold: int=None) -> dict:
@@ -180,13 +178,13 @@ def build_pipeline(numeric_cols:list[str], text_cols:list[str], other_cols:list[
                                        ("cat", cat_transformer)
                                        ])
 
-    classifiers = {
-        'logistic': LogisticRegression(penalty='l2', C=0.9,
+    classifiers = dict(
+        logistic= LogisticRegression(penalty='l2', C=0.9,
                                        multi_class='auto', class_weight='balanced',
                                        random_state=1830, solver='newton-cg', max_iter=100),
-        'gbt': GradientBoostingClassifier(random_state=1830),
-        'random_forest': RandomForestClassifier(random_state=1830)
-    }
+        gbt= GradientBoostingClassifier(random_state=1830),
+        random_forest= RandomForestClassifier(random_state=1830)
+        )
 
     if classifier not in classifiers:
         raise ValueError("Invalid classifier name. Choose 'logistic', 'gbt', or 'random_forest'.")
@@ -211,7 +209,27 @@ def build_pipeline(numeric_cols:list[str], text_cols:list[str], other_cols:list[
     return pipeline
 
 def tune_model(X: pd.DataFrame, y: pd.Series, max_features: int=1000, n_iter: int=20, classifier: str='logistic') -> Pipeline:
+    """
+    Tune a machine learning model with hyperparameter optimization.
 
+    Parameters
+    ----------
+    X : pd.DataFrame
+        The feature matrix.
+    y : pd.Series
+        The target variable.
+    max_features : int, optional
+        The maximum number of features for tf-idf vectorization, by default 1000.
+    n_iter : int, optional
+        The number of iterations for hyperparameter optimization, by default 20.
+    classifier : str, optional
+        The classifier to use in the pipeline ('logistic', 'gbt', or 'random_forest'), by default 'logistic'.
+
+    Returns
+    -------
+    Pipeline : imblearn.pipeline.Pipeline/sklearn.pipeline.Pipeline
+        A scikit-learn pipeline containing a tuned machine learning model.
+    """
 
     numeric_cols = X.select_dtypes(include=[np.number]).columns
     text_cols = ["amenities", "description", "host_about"]
@@ -219,14 +237,7 @@ def tune_model(X: pd.DataFrame, y: pd.Series, max_features: int=1000, n_iter: in
 
     pipe_model = build_pipeline(numeric_cols, text_cols, other_cols, max_features_tfidf = max_features, classifier=classifier)
 
-    pipe_params = dict(preprocessing__text__selectkbest__k=np.arange(100, 2000 + 1, 100)
-                       )
-
-    if classifier == "logistic":
-        params_log = dict(classifier__C=stats.uniform(loc=0, scale=5),
-                          classifier__penalty=["l1", "l2"]
-                          )
-        pipe_params.update(params_log)
+    pipe_params = params_combiner()
 
     rand_search = RandomizedSearchCV(pipe_model, param_distributions=pipe_params, cv=5,
                                      n_iter=n_iter, random_state=1830, verbose=2)
