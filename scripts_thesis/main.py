@@ -7,8 +7,8 @@ import pickle
 from colorama import Fore, Style
 
 from scripts_thesis.data import DataLoader, LoadDataMixin
-from scripts_thesis.model_ML import train_model, evaluate_model, predict_model, load_model
-from scripts_thesis.utils import get_top_features, model_explainer, plot_confusion_matrix, auc_cross_val
+from scripts_thesis.model_ML import train_model, evaluate_model, predict_model, load_model, tune_model
+from scripts_thesis.utils import get_top_features, model_explainer, plot_confusion_matrix, auc_cross_val, params_extracter
 
 from scripts_thesis.params import *
 from scripts_thesis.preproc import *
@@ -127,11 +127,7 @@ class ModelFlow(LoadDataMixin, DataLoader):
         print(Fore.BLUE + "\nTraining model..." + Style.RESET_ALL)
         model, results, auc_metrics = train_model(X, y, test_split) #auc_metrics = (test_list, pred_list)
 
-        auc_cross_val(auc_metrics[0], auc_metrics[1])
-
-
         model_iteration = len(os.listdir(LOCAL_MODEL_PATH)) + 1
-
         file_name = f'model_V{model_iteration}.pkl'
         full_file_path = os.path.join(LOCAL_MODEL_PATH, file_name)
         pickle.dump(model, open(full_file_path, 'wb'))
@@ -140,7 +136,29 @@ class ModelFlow(LoadDataMixin, DataLoader):
         full_file_path = os.path.join(LOCAL_RESULT_PATH, file_name)
         results.to_csv(full_file_path)
 
-    def optimise(file_name: str = None, target: str = "license", test_split: float = 0.):
+        file_name = f'auc_curve_{model_iteration}'
+        full_file_path = os.path.join(LOCAL_IMAGE_PATH, file_name)
+        fig =  auc_cross_val(auc_metrics[0], auc_metrics[1])
+        fig.savefig(fname=full_file_path, format="png")
+
+    def optimise(file_name: str = None, target: str = "license", classifier: str=None):
+        """
+        _summary_
+
+        Parameters
+        ----------
+        file_name : str, optional
+            _description_, by default None
+        target : str, optional
+            _description_, by default "license"
+        classifier : str, optional
+            _description_, by default None
+
+        Returns
+        -------
+        _type_
+            _description_
+        """
 
         print(Fore.MAGENTA + "\n⭐️ Use case: optimise" + Style.RESET_ALL)
         print(Fore.BLUE + "\nLoading preprocessed validation data..." + Style.RESET_ALL)
@@ -149,8 +167,24 @@ class ModelFlow(LoadDataMixin, DataLoader):
         if X is None: #Used to exit the function and trigger an error if load_processed_data fails
             return None
 
-        print(Fore.BLUE + "\nTraining model..." + Style.RESET_ALL)
+        print(Fore.BLUE + "\nTuning model..." + Style.RESET_ALL)
 
+        if classifier is None:
+            classifier=["logistic", "gbt", "random_forest"]
+
+        tuned_models =  {model: tune_model(X, y, n_iter=50, classifier=model) for model in classifier}
+        tuned_results = {key: [model.best_estimator_, params_extracter(model)] for key, model in tuned_models.items()}
+        tuned_results = {key: value for key, value in sorted(tuned_models.items(), key= lambda x : x[1][1].get("precision"))}
+
+        print(Fore.BLUE + "Best results are:" + Style.RESET_ALL)
+        for key in tuned_results.keys():
+            print(f"{key} : {tuned_results.get(key)[1]}")
+            print("With params:")
+            print(tuned_results.get(key)[0])
+
+        best_model = list(tuned_results.keys())[0]
+
+        return tuned_models.get(best_model)
 
 
     def evaluate(file_name: str = None, target: str = "license") -> pd.DataFrame:

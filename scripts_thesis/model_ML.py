@@ -4,7 +4,7 @@ from sklearn.experimental import enable_iterative_imputer
 from sklearn.impute import IterativeImputer
 from sklearn.model_selection import train_test_split, RepeatedStratifiedKFold, RandomizedSearchCV, GridSearchCV
 from sklearn.metrics import accuracy_score, precision_score, f1_score, recall_score, classification_report, make_scorer
-from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
+from sklearn.ensemble import HistGradientBoostingClassifier , RandomForestClassifier
 
 from sklearn.linear_model import LogisticRegression, SGDClassifier
 from sklearn.feature_selection import SelectKBest, chi2
@@ -28,14 +28,6 @@ from scripts_thesis.utils import custom_combiner, params_combiner
 from scripts_thesis.params import *
 
 from colorama import Fore, Style
-
-
-scoring = dict(
-    AUC="roc_auc",
-    accuracy=make_scorer(accuracy_score),
-    precision=make_scorer(precision_score)
-    )
-
 
 def print_results(y_test: np.ndarray, y_pred: np.ndarray, verbose: bool= True, fold: int=None) -> dict:
     """
@@ -113,8 +105,8 @@ def baseline_model(y: np.ndarray, test_split: float=0.3) -> np.ndarray:
     return y_random, y_majority
 
 
-def build_pipeline(numeric_cols:list[str], text_cols:list[str], other_cols:list[str],
-                   classifier:str='logistic', max_features_tfidf: int=10000, max_kbest: int=1000) -> Pipeline:
+def build_pipeline(numeric_cols: list[str], text_cols: list[str], other_cols: list[str],
+                   classifier: str='logistic', max_features_tfidf: int=10000, max_kbest: int=1000) -> Pipeline:
     """
     A convenience function created to quickly build a pipeline. Requires the columns' names for the column transformer.
     Pipeline takes a cleaned dataset.
@@ -139,6 +131,7 @@ def build_pipeline(numeric_cols:list[str], text_cols:list[str], other_cols:list[
     Pipeline
         A sklearn pipeline, not fitted
     """
+
     numeric_transformer = Pipeline(steps=[
         ('imputer', IterativeImputer(random_state=1830)),
         ('scaler', RobustScaler())
@@ -181,9 +174,9 @@ def build_pipeline(numeric_cols:list[str], text_cols:list[str], other_cols:list[
     classifiers = dict(
         logistic= LogisticRegression(penalty='l2', C=0.9,
                                        multi_class='auto', class_weight='balanced',
-                                       random_state=1830, solver='newton-cg', max_iter=100),
-        gbt= GradientBoostingClassifier(random_state=1830),
-        random_forest= RandomForestClassifier(random_state=1830)
+                                       random_state=1830, solver='liblinear', max_iter=1000),
+        gbt= HistGradientBoostingClassifier(random_state=1830),
+        random_forest= RandomForestClassifier(random_state=1830, class_weight="balanced")
         )
 
     if classifier not in classifiers:
@@ -191,24 +184,20 @@ def build_pipeline(numeric_cols:list[str], text_cols:list[str], other_cols:list[
 
     classifier_model = classifiers[classifier]
 
-
     # Create the final pipeline
     pipeline = Pipeline([
         ("balancing", RandomUnderSampler(random_state=1830)),
-        ('preprocessing', column_transformer),
-       #('smote', SMOTE(random_state=42, k_neighbors=20)),
-       #('selector', SelectKBest(chi2, k = 2000)),
-        ('classifier', LogisticRegression(penalty = 'l2', C = .9,
-                                multi_class = 'auto', class_weight = 'balanced',
-                                random_state = 1830, solver = 'liblinear', max_iter = 1000))
-        ]
+        ('preprocessing', column_transformer)]
                         )
 
-    pipeline.named_steps['classifier'] = classifier_model
+    #('smote', SMOTE(random_state=42, k_neighbors=20)),
+    #('selector', SelectKBest(chi2, k = 2000)),
+
+    pipeline.steps.append(['classifier', classifier_model]) #Adding a classifier head
 
     return pipeline
 
-def tune_model(X: pd.DataFrame, y: pd.Series, max_features: int=1000, n_iter: int=20, classifier: str='logistic') -> Pipeline:
+def tune_model(X: pd.DataFrame, y: pd.Series, max_features: int=1000, n_iter: int=20, cv: int=5, classifier: str='logistic') -> Pipeline:
     """
     Tune a machine learning model with hyperparameter optimization.
 
@@ -222,6 +211,8 @@ def tune_model(X: pd.DataFrame, y: pd.Series, max_features: int=1000, n_iter: in
         The maximum number of features for tf-idf vectorization, by default 1000.
     n_iter : int, optional
         The number of iterations for hyperparameter optimization, by default 20.
+    cv : int, optional
+        The number of folds for each combination of hyperparameters on which to cross validate
     classifier : str, optional
         The classifier to use in the pipeline ('logistic', 'gbt', or 'random_forest'), by default 'logistic'.
 
@@ -238,11 +229,21 @@ def tune_model(X: pd.DataFrame, y: pd.Series, max_features: int=1000, n_iter: in
     pipe_model = build_pipeline(numeric_cols, text_cols, other_cols, max_features_tfidf = max_features, classifier=classifier)
 
     pipe_params = params_combiner()
+    scoring = dict(AUC="roc_auc",
+                   accuracy=make_scorer(accuracy_score),
+                   precision=make_scorer(precision_score)
+                   )
 
-    rand_search = RandomizedSearchCV(pipe_model, param_distributions=pipe_params, cv=5,
-                                     n_iter=n_iter, random_state=1830, verbose=2)
+    rand_search = RandomizedSearchCV(pipe_model,
+                                     param_distributions=pipe_params,
+                                     cv=cv,
+                                     n_iter=n_iter,
+                                     scoring=scoring,
+                                     refit="precision",
+                                     random_state=1830,
+                                     verbose=2)
+
     rand_search.fit(X, y)
-
     print(rand_search.best_score_)
 
     return rand_search

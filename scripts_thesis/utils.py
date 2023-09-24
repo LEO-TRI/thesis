@@ -396,19 +396,44 @@ def params_combiner(classifier: str="logistic") -> dict:
 
     if classifier == "logistic":
         params_log = dict(classifier__C=stats.uniform(loc=0, scale=5),
-                        classifier__penalty=["l1", "l2"]
+                          classifier__penalty=["l1", "l2"]
                         )
         pipe_params.update(params_log)
 
     elif classifier == "gbt":
-        params_log = dict(classifier__C=stats.uniform(loc=0, scale=5),
-                        classifier__penalty=["l1", "l2"]
-                        )
-        pipe_params.update(params_log)
+        params_gbt = dict(classifier__learning_rate=stats.uniform(loc=0, scale=1),
+                          classifier__max_depth=np.arange(1, 5),
+                          classifier__max_leaf_nodes=np.arange(5, 60),
+                          classifier__l2_regularization=stats.uniform(loc=0, scale=1)
+                          )
+        pipe_params.update(params_gbt)
     else:
-        params_log = dict(classifier__C=stats.uniform(loc=0, scale=5),
-                        classifier__penalty=["l1", "l2"]
-                        )
-        pipe_params.update(params_log)
+        params_rf = dict(classifier__n_estimators=np.arange(50, 301, 10),
+                          classifier__max_depth=np.arange(1, 5),
+                          classifier__max_leaf_nodes=np.arange(20, 101),
+                          classifier__min_samples_split =np.arange(2, 50),
+                          classifier__min_samples_leaf=np.arange(1, 50),
+                          classifier__max_features=["log2", "sqrt"],
+                          )
+        pipe_params.update(params_rf)
 
     return pipe_params
+
+def params_extracter(model: object) -> dict:
+    """
+    A convenience function to extract the parameters from a randomized search
+
+    Parameters
+    ----------
+    model : object
+        A sklearn model or pipeline that has been cross-searched
+
+    Returns
+    -------
+    dict
+        A dict of the best scores for the cross validation
+    """
+
+    ind = model.cv_results_.get("mean_test_precision").argmax()
+    res = [key for key in model.cv_results_.keys() if "mean_test_" in key]
+    return {key[10:]: model.cv_results_.get(key)[ind] for key in res} #To remove mean_test_
