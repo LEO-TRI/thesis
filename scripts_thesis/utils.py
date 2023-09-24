@@ -13,12 +13,13 @@ import plotly.graph_objects as go
 hex_colors = [mcolors.to_hex(color) for color in sns.diverging_palette(145, 300, s=60, n=5)]
 hex_colors.reverse()
 
+custom_params = {"axes.spines.right": False, "axes.spines.top": False, "figure.figsize":(8, 8)}
+sns.set_theme(context='notebook', style='darkgrid', palette='deep', rc= custom_params)
+
 def date_range(min_date, date, max_date) -> [bool]:
     return (min_date <= date <= max_date)
 
-
 date_range_vec = np.vectorize(date_range)
-
 
 def update_prop(handle, orig):
     handle.update_from(orig)
@@ -297,23 +298,19 @@ def model_dl_examiner(train: np.ndarray, val: np.ndarray) -> go.Figure:
     fig.show()
 
 
-def auc_cross_val(pred: list, test_list: list, n_splits: int= 5):
+def auc_cross_val(test_array: list, pred_array: list, n_splits: int= 5):
     """
     _summary_
 
     Parameters
     ----------
-    pred : list
+    test_array : list
         _description_
-    test_list : list
+    pred_array : list
         _description_
     n_splits : int, optional
         _description_, by default 5
     """
-
-
-    fig, ax = plt.subplots(figsize=(6, 6))
-
 
     tprs = []
     aucs = []
@@ -321,18 +318,19 @@ def auc_cross_val(pred: list, test_list: list, n_splits: int= 5):
 
     fig, ax = plt.subplots(figsize=(6, 6))
 
-    for fold, (y_test, y_pred) in enumerate(zip(test_list, pred)):
+    for fold, (y_test, y_pred) in enumerate(zip(test_array, pred_array)):
+
 
         viz = RocCurveDisplay.from_predictions(
             y_test,
             y_pred,
-            name=f"ROC fold {fold}",
+            name=f"ROC fold {1 + fold // n_splits} - {fold % n_splits + 1}",
             alpha=0.3,
             lw=1,
             ax=ax,
-            plot_chance_level=(fold == n_splits - 1),
+            plot_chance_level=(fold == n_splits * 2 - 1),
         )
-        interp_tpr = np.interp(mean_fpr, viz.fpr, viz.tpr)
+        interp_tpr = np.interp(mean_fpr, viz.fpr, viz.tpr) # Interpolates additional points for the curve
         interp_tpr[0] = 0.0
         tprs.append(interp_tpr)
         aucs.append(viz.roc_auc)
@@ -368,8 +366,11 @@ def auc_cross_val(pred: list, test_list: list, n_splits: int= 5):
         ylim=[-0.05, 1.05],
         xlabel="False Positive Rate",
         ylabel="True Positive Rate",
-        title=f"Mean ROC curve with variability\n(Positive label '{target_names[1]}')",
+        title="Mean ROC curve with variability\n (Positive label)",
     )
+
     ax.axis("square")
-    ax.legend(loc="lower right")
+    ax.legend(bbox_to_anchor=(1.75, 0.25), loc="lower right")
     plt.show()
+
+    return fig

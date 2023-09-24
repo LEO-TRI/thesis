@@ -2,32 +2,44 @@
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.experimental import enable_iterative_imputer
 from sklearn.impute import IterativeImputer
-from sklearn.model_selection import train_test_split, cross_validate, RepeatedStratifiedKFold
-from sklearn.metrics import accuracy_score, precision_score, f1_score, recall_score, classification_report, RocCurveDisplay, auc
+from sklearn.model_selection import train_test_split, RepeatedStratifiedKFold, RandomizedSearchCV, GridSearchCV
+from sklearn.metrics import accuracy_score, precision_score, f1_score, recall_score, classification_report, make_scorer
+from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
+
 from sklearn.linear_model import LogisticRegression, SGDClassifier
 from sklearn.feature_selection import SelectKBest, chi2
 from sklearn.preprocessing import RobustScaler, OneHotEncoder
 from sklearn.pipeline import FeatureUnion
 from sklearn.compose import ColumnTransformer
 
-import pandas as pd
-import numpy as np
-
-from scripts_thesis.utils import custom_combiner
-from scripts_thesis.params import *
-
 from imblearn.pipeline import Pipeline
 from imblearn.over_sampling import SMOTE
 from imblearn.under_sampling import RandomUnderSampler
 
-from colorama import Fore, Style
+from scipy import stats
 
+import pandas as pd
+import numpy as np
+import time
 import os
 import pickle
 
-scoring = ['accuracy', 'precision', 'recall', 'f1']
+from scripts_thesis.utils import custom_combiner
+from scripts_thesis.params import *
 
-def print_results(y_test: np.ndarray, y_pred: np.ndarray) -> dict:
+from colorama import Fore, Style
+
+
+scoring = dict(
+    AUC="roc_auc",
+    accuracy=make_scorer(accuracy_score),
+    precision=make_scorer(precision_score)
+    )
+
+
+
+
+def print_results(y_test: np.ndarray, y_pred: np.ndarray, verbose: bool= True, fold: int=None) -> dict:
     """
     Convenience function used to quickly compute and display the evaluation metrics of a model.
     Can be used after getting y_pred from a trained model.
@@ -39,6 +51,11 @@ def print_results(y_test: np.ndarray, y_pred: np.ndarray) -> dict:
         Array of the real values
     y_pred : np.ndarray
         Array of the predicted values
+    verbose: bool
+        Whether to print the results, by default True
+    fold: int
+        The fold on which the data was train, by default None
+
 
     Returns
     -------
@@ -54,10 +71,14 @@ def print_results(y_test: np.ndarray, y_pred: np.ndarray) -> dict:
     metrics_name = ["accuracy", "precision", "recall", "f1"]
     metrics = dict(zip(metrics_name, metrics))
 
-    print(f"Accuracy: {metrics.get('accuracy')}",
-          f"Precision: {metrics.get('precision')}",
-          f"Recall: {metrics.get('recall')}",
-          f"F1 Score: {metrics.get('f1')}")
+    if fold is not None:
+        metrics['fold'] = fold + 1
+
+    if verbose:
+        print(f"Accuracy: {metrics.get('accuracy')}",
+            f"Precision: {metrics.get('precision')}",
+            f"Recall: {metrics.get('recall')}",
+            f"F1 Score: {metrics.get('f1')}")
 
     return metrics
 
@@ -95,8 +116,7 @@ def baseline_model(y: np.ndarray, test_split: float=0.3) -> np.ndarray:
 
 
 def build_pipeline(numeric_cols:list[str], text_cols:list[str], other_cols:list[str],
-                   description:str='description', amenities:str='amenities', host:str="host_about",
-                   max_features: int=1000, max_features_tfidf: int=10000, max_kbest: int=1000) -> Pipeline:
+                   classifier:str='logistic', max_features_tfidf: int=10000, max_kbest: int=1000) -> Pipeline:
     """
     A convenience function created to quickly build a pipeline. Requires the columns' names for the column transformer.
     Pipeline takes a cleaned dataset.
@@ -111,6 +131,8 @@ def build_pipeline(numeric_cols:list[str], text_cols:list[str], other_cols:list[
         The text columns of the dataset
     other_cols : list(str)
         The remaining columns of the dataset
+    classifier : str, optional
+        The classifier to use ('logistic', 'gbt', 'random_forest'), by default 'logistic'
     max_features : int, optional
         How many columns to keep from the tfidf vectorization, by default 1000
 
@@ -119,7 +141,6 @@ def build_pipeline(numeric_cols:list[str], text_cols:list[str], other_cols:list[
     Pipeline
         A sklearn pipeline, not fitted
     """
-
     numeric_transformer = Pipeline(steps=[
         ('imputer', IterativeImputer(random_state=1830)),
         ('scaler', RobustScaler())
@@ -134,9 +155,9 @@ def build_pipeline(numeric_cols:list[str], text_cols:list[str], other_cols:list[
 
     text_transformers = ColumnTransformer(
         transformers=[
-            ('text1', TfidfVectorizer(max_features=max_features_tfidf, ngram_range = (1, 3), max_df=0.8, norm="l1"), description),
-            ('text2', TfidfVectorizer(max_features=max_features_tfidf, ngram_range = (1, 3), max_df=0.8, norm="l1"), amenities),
-            ('text3', TfidfVectorizer(max_features=max_features_tfidf, ngram_range = (1, 3), max_df=0.8, norm="l1"), host)
+            ('text1', TfidfVectorizer(max_features=max_features_tfidf, ngram_range = (1, 3), max_df=0.8, norm="l1"), text_cols[0]),
+            ('text2', TfidfVectorizer(max_features=max_features_tfidf, ngram_range = (1, 3), max_df=0.8, norm="l1"), text_cols[1]),
+            ('text3', TfidfVectorizer(max_features=max_features_tfidf, ngram_range = (1, 3), max_df=0.8, norm="l1"), text_cols[2])
             ],
         remainder='drop'  # Pass through any other columns not specified
         )
@@ -159,6 +180,20 @@ def build_pipeline(numeric_cols:list[str], text_cols:list[str], other_cols:list[
                                        ("cat", cat_transformer)
                                        ])
 
+    classifiers = {
+        'logistic': LogisticRegression(penalty='l2', C=0.9,
+                                       multi_class='auto', class_weight='balanced',
+                                       random_state=1830, solver='newton-cg', max_iter=100),
+        'gbt': GradientBoostingClassifier(random_state=1830),
+        'random_forest': RandomForestClassifier(random_state=1830)
+    }
+
+    if classifier not in classifiers:
+        raise ValueError("Invalid classifier name. Choose 'logistic', 'gbt', or 'random_forest'.")
+
+    classifier_model = classifiers[classifier]
+
+
     # Create the final pipeline
     pipeline = Pipeline([
         ("balancing", RandomUnderSampler(random_state=1830)),
@@ -167,14 +202,42 @@ def build_pipeline(numeric_cols:list[str], text_cols:list[str], other_cols:list[
        #('selector', SelectKBest(chi2, k = 2000)),
         ('classifier', LogisticRegression(penalty = 'l2', C = .9,
                                 multi_class = 'auto', class_weight = 'balanced',
-                                random_state = 1830, solver = 'newton-cg', max_iter = 100))
+                                random_state = 1830, solver = 'liblinear', max_iter = 1000))
         ]
                         )
 
+    pipeline.named_steps['classifier'] = classifier_model
+
     return pipeline
 
+def tune_model(X: pd.DataFrame, y: pd.Series, max_features: int=1000, n_iter: int=20, classifier: str='logistic') -> Pipeline:
 
-def train_model(X: pd.DataFrame, y: np.ndarray, test_split: float=0.3, max_features: int=1000, n_splits: int = 5) -> Pipeline:
+
+    numeric_cols = X.select_dtypes(include=[np.number]).columns
+    text_cols = ["amenities", "description", "host_about"]
+    other_cols = list(set(X.columns) - set(numeric_cols) - set(text_cols))
+
+    pipe_model = build_pipeline(numeric_cols, text_cols, other_cols, max_features_tfidf = max_features, classifier=classifier)
+
+    pipe_params = dict(preprocessing__text__selectkbest__k=np.arange(100, 2000 + 1, 100)
+                       )
+
+    if classifier == "logistic":
+        params_log = dict(classifier__C=stats.uniform(loc=0, scale=5),
+                          classifier__penalty=["l1", "l2"]
+                          )
+        pipe_params.update(params_log)
+
+    rand_search = RandomizedSearchCV(pipe_model, param_distributions=pipe_params, cv=5,
+                                     n_iter=n_iter, random_state=1830, verbose=2)
+    rand_search.fit(X, y)
+
+    print(rand_search.best_score_)
+
+    return rand_search
+
+
+def train_model(X: pd.DataFrame, y: pd.Series, test_split: float=0.3, max_features: int=1000, n_splits: int = 5) -> Pipeline:
     """
     Fit the passed model with the passed data and return a tuple (fitted_model, history)
 
@@ -182,7 +245,7 @@ def train_model(X: pd.DataFrame, y: np.ndarray, test_split: float=0.3, max_featu
     ----------
     X : pd.DataFrame
         The dataframe of features
-    y : np.ndarray
+    y : pd.Series
         The target variable
     test_split : float, optional
         The split between train and test samples, by default 0.3
@@ -194,16 +257,16 @@ def train_model(X: pd.DataFrame, y: np.ndarray, test_split: float=0.3, max_featu
     Returns
     -------
     Pipeline : imblearn.pipeline.Pipeline/sklearn.pipeline.Pipeline
-        A fitted pipeline object
+        A fitted pipeline obj
     res : pd.DataFrame
-        A dataframe with the mean cross-validated metrics (4 in total)
+        A dataframe with the mean cross-validated metrics (4 in total + the fold number)
     """
 
     numeric_cols = X.select_dtypes(include=[np.number]).columns
     text_cols = ["amenities", "description", "host_about"]
     other_cols = list(set(X.columns) - set(numeric_cols) - set(text_cols))
 
-    pipe_model = build_pipeline(numeric_cols, other_cols, max_features_tfidf = max_features)
+    pipe_model = build_pipeline(numeric_cols, text_cols, other_cols, max_features_tfidf = max_features)
 
     print(Fore.BLUE + "\nLaunching CV" + Style.RESET_ALL)
 
@@ -214,33 +277,31 @@ def train_model(X: pd.DataFrame, y: np.ndarray, test_split: float=0.3, max_featu
     test_list = []
 
     for fold, (train, test) in enumerate(cv.split(X, y)):
-        pipe_model.fit(X[train], y[train])
-        y_pred = pipe_model.predict(X[test])
+        start_time = time.time()  # Record the start time
+        pipe_model.fit(X.loc[train,:], y[train])
+        y_pred = pipe_model.predict(X.loc[test,:])
 
-        res.append(print_results(y[test], y_pred))
+        res.append(print_results(y[test], y_pred, verbose=False, fold=fold))
+
         pred_list.append(y_pred)
         test_list.append(y[test])
 
+        end_time = time.time()  # Record the end time
+        elapsed_time = end_time - start_time  # Calculate elapsed time
 
+        print(f"CV Number {fold + 1} done. Time elapsed: {elapsed_time:.2f} seconds")
 
-
-
-
-
+    res = pd.DataFrame(res)
 
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_split, random_state=1830, stratify=y)
-    res = cross_validate(pipe_model, X_train, y_train, verbose=2, cv=cv, scoring=scoring)
-    res = pd.DataFrame(res)
+    pipe_model.fit(X_train, y_train)
 
     #size_data = y_train.value_counts().sort_values(ascending=False).iloc[0] * 16
     print(f"✅ Model trained on \n {len(X_train)} original rows")
-    print(f"Mean cross_validated accuracy: {round(np.mean(res.get('test_accuracy')), 2)}")
-    print(f"Mean cross_validated precision: {round(np.mean(res.get('test_precision')), 2)}")
+    print(f"Mean cross_validated accuracy: {round(np.mean(res['accuracy']), 2)}")
+    print(f"Mean cross_validated precision: {round(np.mean(res['precision']), 2)}")
 
-    pipe_model.fit(X_train, y_train)
-
-    return pipe_model, res
-
+    return pipe_model, res, (pred_list, test_list)
 
 def evaluate_model(model, X: pd.DataFrame, y: pd.Series, test_split:float=0.3) -> pd.DataFrame:
     """

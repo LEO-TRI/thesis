@@ -108,16 +108,17 @@ def preprocess_data(df:pd.DataFrame) -> pd.DataFrame:
     df_text = df.drop_duplicates(subset =["id"]).copy()
     temp_df = df.groupby("host_id").agg(count_obj=("name", "count")).reset_index()
     df_text = df_text.merge(temp_df.loc[:, ["count_obj", "host_id"]], on="host_id", how="left")
+    print("Step 2 done")
 
     unique_val = text_selector(df_text) #Selecting unique_val
     df_merged = df_text.merge(unique_val.loc[:, ["host_about", "group"]], on="host_about", how="left")
-    print("Step 2 done")
+    print("Step 3 done")
 
     unique_val_de = text_desc_selector(df_merged) #Selecting unique_val_de
     mask = df_merged["description"].isin(unique_val_de["description"])
     condition = (mask) & (df_merged["count_obj"] < df_merged["description"].map(unique_val_de.set_index("description")["count_obj_de"]))
     df_merged.loc[condition, "count_obj"] = df_merged.loc[condition, "description"].map(unique_val_de.set_index("description")["count_obj_de"])
-    print("Step 3 done")
+    print("Step 4 done")
 
     df_merged["group"] = np.where(df_merged["group"].isna(), 0, df_merged["group"])
     condition = (df_merged["group"]==0) & (df_merged["count_obj"]>1)
@@ -126,7 +127,7 @@ def preprocess_data(df:pd.DataFrame) -> pd.DataFrame:
     temp_df = temp_df.merge(temp_df.groupby("host_id").agg(count_obj_host=("name", np.count_nonzero)).reset_index())
     temp_df = temp_df.merge(temp_df.groupby("description").agg(count_obj_desc=("name", np.count_nonzero)).reset_index())
     temp_df.loc[temp_df["count_obj_desc"]==66, "count_obj_desc"]= 1
-    print("Step 4 done")
+    print("Step 5 done")
 
     #Merging groups
     condition = temp_df["count_obj_desc"]<temp_df["count_obj_host"]
