@@ -139,24 +139,23 @@ class ModelFlow(LoadDataMixin, DataLoader):
             return None
 
         if classifiers is None:
-            classifiers=["logistic", "gbt", "random_forest"]
+            classifiers=["logistic", "gbt", "random_forest", "sgd", "xgb", "stacked"]
 
         print(Fore.MAGENTA + f"\nTuning {len(classifiers)} model(s)..." + Style.RESET_ALL)
 
         tuned_results = {key: tune_model(X, y, n_iter=n_iter, classifier=key) for key in classifiers} #Test the pipeline with hyperparameters for three potential classifiers
-        tuned_results = {key: (model.best_estimator_, params_extracter(model), model) for key, model in tuned_results.items()} #Extract the best results, and parameters from the fitted pipelines
-        tuned_results = {key: value for key, value in sorted(tuned_results.items(), key= lambda x : x[1][1].get("precision"))}
+        tuned_results = {key: list(model.best_estimator_, params_extracter(model), model) for key, model in tuned_results.items()} #Extract the best results, and parameters from the fitted pipelines
+        tuned_results = {key: value for key, value in sorted(tuned_results.items(), key= lambda x : x[1][1].get("precision"), reverse=True)}
 
-        print(Fore.MAGENTA + "Results are:" + Style.RESET_ALL)
+        print(Fore.MAGENTA + "Models' results are:" + Style.RESET_ALL)
         for key in tuned_results.keys():
-            print(f"{key} : {tuned_results.get(key)[1]}")
-            print("With params:")
-            print(tuned_results.get(key)[0])
+            tuned_results.get(key)[1] = {key: np.round(value, 2) for key, value in tuned_results.get(key)[1].items()}
+            print(f"{key} : {tuned_results.get(key)[1]}\n")
 
         best_model_ind = list(tuned_results.keys())[0] #Select the index of the best model
 
         return tuned_results.get(best_model_ind) #Return the best model
-    
+
 
     def train(self, file_name: str = None, target: str = "license", test_split: float = 0.3, classifier: str="logistic") -> None:
         """
@@ -206,7 +205,7 @@ class ModelFlow(LoadDataMixin, DataLoader):
     def evaluate(file_name: str = None, target: str = "license") -> pd.DataFrame:
         """
         Evaluate the performance of the latest production model on processed data.\n
-        
+
         Return accuracy, recall, precision and f1 as a pd.DataFrame.
 
         Parameters
@@ -219,7 +218,7 @@ class ModelFlow(LoadDataMixin, DataLoader):
         Returns
         -------
         pd.DataFrame
-            A pd.DataFrame integrating the results from the evaluation 
+            A pd.DataFrame integrating the results from the evaluation
         """
 
         print(Fore.MAGENTA + "\n⭐️ Use case: evaluate" + Style.RESET_ALL)
@@ -264,7 +263,7 @@ class ModelFlow(LoadDataMixin, DataLoader):
         """
 
         if X_pred is None:
-            X_pred = self.pred_data #10 rows of the original data removed during preprocessing and never seen by the model. 
+            X_pred = self.pred_data #10 rows of the original data removed during preprocessing and never seen by the model.
 
         print("\n⭐️ Use case: predict")
 
@@ -290,11 +289,11 @@ class ModelFlow(LoadDataMixin, DataLoader):
         Notes
         -------
         Method that produces a graph showing main features used to predict fraud.
-        
+
         Takes the last saved ML model as input by default.
-        
+
         Saves a csv file with the model coefficient + an jpeg version.
-        
+
         Coordinates for saved documents are given in params (LOCAL_COEFS_PATH and LOCAL_IMAGE_PATH respectively).
         """
 
