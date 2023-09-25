@@ -16,13 +16,15 @@ from imblearn.pipeline import Pipeline
 from imblearn.over_sampling import SMOTE
 from imblearn.under_sampling import RandomUnderSampler
 
+import xgboost as xgb
+
 import pandas as pd
 import numpy as np
 import time
 import os
 import pickle
 
-from scripts_thesis.utils import custom_combiner, params_combiner, sparse_to_dense
+from scripts_thesis.utils import params_combiner, sparse_to_dense
 from scripts_thesis.params import *
 
 from colorama import Fore, Style
@@ -184,9 +186,10 @@ def build_pipeline(numeric_cols: list[str], text_cols: list[str], other_cols: li
     classifiers = dict(logistic= LogisticRegression(penalty='l2', C=0.9, class_weight='balanced', random_state=1830, solver='liblinear', max_iter=1000),
                        gbt= HistGradientBoostingClassifier(random_state=1830),
                        random_forest= RandomForestClassifier(random_state=1830, class_weight="balanced"),
-                       sgd= SGDClassifier(random_state=1830, eta0=1)
+                       sgd= SGDClassifier(random_state=1830, eta0=1),
+                       xgb=xgb.XGBClassifier(random_state =1830)
                        )
-    
+
 
     if classifier == "stacked":
         estimators = [('rf', classifiers.get("random_forest")),
@@ -252,10 +255,10 @@ def tune_model(X: pd.DataFrame, y: pd.Series, max_features: int=1000, n_iter: in
                                      scoring=scoring,
                                      refit="precision",
                                      random_state=1830,
-                                     verbose=2)
+                                     verbose=1)
 
     rand_search.fit(X, y)
-    print(Fore.BLUE + f"Precision is :{rand_search.best_score_}" + Style.RESET_ALL )
+    print(Fore.BLUE + f"Precision for {classifier} is : {np.round(rand_search.best_score_, 2)}\n" + Style.RESET_ALL )
 
     return rand_search
 
@@ -306,7 +309,7 @@ def train_model(X: pd.DataFrame, y: pd.Series, test_split: float=0.3, max_featur
     proba_list = []
 
     has_proba = True
-    if "classifier__loss" in pipe_model.get_params().keys(): #Filters for models that cannot produce probabilities estimates 
+    if "classifier__loss" in pipe_model.get_params().keys(): #Filters for models that cannot produce probabilities estimates
         has_proba = False
 
     for fold, (train, test) in enumerate(cv.split(X, y)):
@@ -315,9 +318,9 @@ def train_model(X: pd.DataFrame, y: pd.Series, test_split: float=0.3, max_featur
         y_pred = pipe_model.predict(X.loc[test,:])
 
         if has_proba:
-            y_proba = pipe_model.predict_proba(X.loc[test,:]) 
+            y_proba = pipe_model.predict_proba(X.loc[test,:])
             proba_list.append(y_proba)
-        
+
         res.append(print_results(y[test], y_pred, verbose=False, fold=fold))
 
         pred_list.append(y_pred)

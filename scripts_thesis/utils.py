@@ -68,7 +68,7 @@ def custom_combiner(feature, category):
     A convenience function that can be used in sklearn's ohe to format column names.
 
     Used only in build pipelines in model_ML.py
-    
+
     Requires sklearn version >= 1.3.0
     """
     return str(category)
@@ -154,7 +154,7 @@ def params_combiner(classifier: str="logistic") -> dict:
     """
     A convenience function used to create the parameter dictionnary for hyperparameter tuning
 
-    Functions only with RandomizedSearchCV because of the use of scipy.stats with a continuous distribution. 
+    Functions only with RandomizedSearchCV because of the use of scipy.stats with a continuous distribution.
 
     Parameters
     ----------
@@ -168,7 +168,6 @@ def params_combiner(classifier: str="logistic") -> dict:
     """
 
     pipe_params = dict(preprocessing__text__selectkbest__k=np.arange(100, 2000 + 1, 100),
-                       preprocessing__text__selectkbest__score_func=[chi2, SelectFpr, SelectFwe],
                        preprocessing__text__text_preprocessing__text1__ngram_range=[(1, 1), (1, 2), (1, 3)],
                        preprocessing__text__text_preprocessing__text2__ngram_range=[(1, 1), (1, 2), (1, 3)],
                        preprocessing__text__text_preprocessing__text3__ngram_range=[(1, 1), (1, 2), (1, 3)],
@@ -190,7 +189,7 @@ def params_combiner(classifier: str="logistic") -> dict:
                           classifier__l2_regularization=stats.uniform(loc=0, scale=1)
                           )
         pipe_params.update(params_gbt)
-    
+
     elif classifier == "sgd":
         params_sdg = dict(classifier__penalty=["l1", "l2"],
                           classifier__alpha=stats.uniform(loc=0, scale=1),
@@ -227,7 +226,7 @@ def params_extracter(model: object) -> dict:
     """
 
     ind = model.cv_results_.get("mean_test_precision").argmax() #Get the best results according to precision
-    return {key[10:]: model.cv_results_.get(key)[ind] for key in model.cv_results_.keys() if "mean_test_" in key} #[10:] is used to remove mean_test_, 
+    return {key[10:]: model.cv_results_.get(key)[ind] for key in model.cv_results_.keys() if "mean_test_" in key} #[10:] is used to remove mean_test_,
 
 def sparse_to_dense(X: sparse.csr_matrix) -> np.ndarray:
     """

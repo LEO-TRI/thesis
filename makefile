@@ -9,6 +9,9 @@ local_setup:
 preprocess:
 	python -c "from scripts_thesis.main import ModelFlow; ml = ModelFlow(); ml.preprocess()"
 
+optimise:
+	python -c "from scripts_thesis.main import ModelFlow; ml = ModelFlow(); ml.optimise(n_iter=$(n_iter))"
+
 train:
 	python -c "from scripts_thesis.main import ModelFlow; ml = ModelFlow(); ml.train()"
 
