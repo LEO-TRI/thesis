@@ -35,7 +35,10 @@ def main():
 def local_setup()-> None:
     '''
     Method to create the directories for the package.
+
     Takes and returns no objects
+
+    Relies on the files in LOCAL_PATHS to do so
     '''
     for file_path in LOCAL_PATHS:
         if not os.path.exists(file_path):
@@ -45,7 +48,10 @@ def local_setup()-> None:
 class ModelFlow(LoadDataMixin, DataLoader):
     """
     A class to manage the model flow.
-    Keeps as instance information some processed data to be used for prediction
+
+    Keeps as instance information some processed data to be used for prediction.
+
+    Inherits the loading functions from DataLoader thanks to the mixin LoadDataMixin
     """
 
     def __init__(self) -> None:
@@ -72,6 +78,7 @@ class ModelFlow(LoadDataMixin, DataLoader):
         data_clean_pred: pd.DataFrame
             A cleaned df saved in the class and that is used for predicted afterwards
         """
+
         print(Fore.MAGENTA + "\n ⭐️ Use case: preprocess" + Style.RESET_ALL)
 
         # Process data
@@ -101,11 +108,62 @@ class ModelFlow(LoadDataMixin, DataLoader):
         return data_clean_pred
 
     #####MODEL#####
+    def optimise(self, file_name: str = None, target: str = "license", classifiers: list[str]=None, n_iter: int=50):
+        """
+        A method to perform hyperparameters tuning on several classifiers
+
+        Returns a fitted and optimised classifier
+
+        Parameters
+        ----------
+        file_name : str, optional
+            The file from which to pull the processed data, if None returns the latest file, by default None
+        target : str, optional
+            The name of the column to use as feature, by default "license"
+        classifiers : list[str], optional
+            The classifier to use ('logistic', 'gbt', 'random_forest'), if None will test all, by default None
+            Must be passed as a list even if only one is passed.
+
+        Returns
+        -------
+        Pipeline
+            A sklearn pipeline
+        """
+
+        print(Fore.MAGENTA + "\n⭐️ Use case: optimise" + Style.RESET_ALL)
+        print(Fore.MAGENTA + "\nLoading preprocessed validation data..." + Style.RESET_ALL)
+
+        X, y = self.prep_data(file_name=file_name, target=target)
+        if X is None: #Used to exit the function and trigger an error if load_processed_data fails
+            return None
+
+        if classifiers is None:
+            classifiers=["logistic", "gbt", "random_forest"]
+
+        print(Fore.MAGENTA + f"\nTuning {len(classifiers)} model(s)..." + Style.RESET_ALL)
+
+        tuned_results = {key: tune_model(X, y, n_iter=n_iter, classifier=key) for key in classifiers} #Test the pipeline with hyperparameters for three potential classifiers
+        tuned_results = {key: (model.best_estimator_, params_extracter(model), model) for key, model in tuned_results.items()} #Extract the best results, and parameters from the fitted pipelines
+        tuned_results = {key: value for key, value in sorted(tuned_results.items(), key= lambda x : x[1][1].get("precision"))}
+
+        print(Fore.MAGENTA + "Results are:" + Style.RESET_ALL)
+        for key in tuned_results.keys():
+            print(f"{key} : {tuned_results.get(key)[1]}")
+            print("With params:")
+            print(tuned_results.get(key)[0])
+
+        best_model_ind = list(tuned_results.keys())[0] #Select the index of the best model
+
+        return tuned_results.get(best_model_ind) #Return the best model
+    
+
     def train(self, file_name: str = None, target: str = "license", test_split: float = 0.3) -> None:
         """
-        Load data from the data folder.\n
-        Train the instantiated model on the train set.\n
-        Store training results and model weights as a pickle and a csv respectively.\n
+        Load data from the data folder.
+
+        Train the instantiated model on the train set.
+
+        Store training results and model weights as a pickle and a csv respectively.
 
         Parameters
         ----------
@@ -141,61 +199,26 @@ class ModelFlow(LoadDataMixin, DataLoader):
         fig =  auc_cross_val(auc_metrics[0], auc_metrics[1])
         fig.savefig(fname=full_file_path, format="png")
 
-    def optimise(self, file_name: str = None, target: str = "license", classifier: list[str]=None, n_iter: int=50):
-        """
-        A method to perform hyperparameters tuning on several classifiers
-
-        Returns a fitted and optimised classifier
-
-        Parameters
-        ----------
-        file_name : str, optional
-            The file from which to pull the processed data, if None returns the latest file, by default None
-        target : str, optional
-            The name of the column to use as feature, by default "license"
-        classifier : list[str], optional
-            The classifier to use ('logistic', 'gbt', 'random_forest'), if None will test all, by default None
-            Must be passed as a list even if only one is passed.
-
-        Returns
-        -------
-        Pipeline
-            A sklearn pipeline
-        """
-
-        print(Fore.MAGENTA + "\n⭐️ Use case: optimise" + Style.RESET_ALL)
-        print(Fore.MAGENTA + "\nLoading preprocessed validation data..." + Style.RESET_ALL)
-
-        X, y = self.prep_data(file_name=file_name, target=target)
-        if X is None: #Used to exit the function and trigger an error if load_processed_data fails
-            return None
-
-        if classifier is None:
-            classifier=["logistic", "gbt", "random_forest"]
-
-        print(Fore.MAGENTA + f"\nTuning {len(classifier)} model(s)..." + Style.RESET_ALL)
-
-        #Test the pipeline with hyperparameters for three potential classifiers
-        tuned_results =  {model: tune_model(X, y, n_iter=n_iter, classifier=model) for model in classifier}
-        tuned_results = {key: [model.best_estimator_, params_extracter(model), model] for key, model in tuned_results.items()}
-        tuned_results = {key: value for key, value in sorted(tuned_results.items(), key= lambda x : x[1][1].get("precision"))}
-
-        print(Fore.MAGENTA + "Results are:" + Style.RESET_ALL)
-        for key in tuned_results.keys():
-            print(f"{key} : {tuned_results.get(key)[1]}")
-            print("With params:")
-            print(tuned_results.get(key)[0])
-
-        best_model_ind = list(tuned_results.keys())[0]
-
-        return tuned_results.get(best_model_ind)[2]
-
 
     def evaluate(file_name: str = None, target: str = "license") -> pd.DataFrame:
         """
         Evaluate the performance of the latest production model on processed data.\n
+        
         Return accuracy, recall, precision and f1 as a pd.DataFrame.
+
+        Parameters
+        ----------
+        file_name : str, optional
+            The file from which to load the data, by default None
+        target : str, optional
+            The feature column, by default "license"
+
+        Returns
+        -------
+        pd.DataFrame
+            A pd.DataFrame integrating the results from the evaluation 
         """
+
         print(Fore.MAGENTA + "\n⭐️ Use case: evaluate" + Style.RESET_ALL)
 
         data_processed = DataLoader.load_processed_data(file_name=file_name)
@@ -236,8 +259,9 @@ class ModelFlow(LoadDataMixin, DataLoader):
         y_pred : np.array
             An array of predicted values based on X_pred
         """
+        
         if X_pred is None:
-            X_pred = self.pred_data #10 rows of the original data removed during preprocessing and never seen by the model
+            X_pred = self.pred_data #10 rows of the original data removed during preprocessing and never seen by the model. 
 
         print("\n⭐️ Use case: predict")
 
@@ -259,12 +283,18 @@ class ModelFlow(LoadDataMixin, DataLoader):
 
     @staticmethod
     def model_viz()-> None:
-        '''
-        Method that produces a graph showing main words used to predict SDG categories.\n
-        Takes the last saved ML model as input by default.\n
-        Saves a csv file with the model coefficient + an jpeg version.\n
+        """
+        Notes
+        -------
+        Method that produces a graph showing main features used to predict fraud.
+        
+        Takes the last saved ML model as input by default.
+        
+        Saves a csv file with the model coefficient + an jpeg version.
+        
         Coordinates for saved documents are given in params (LOCAL_COEFS_PATH and LOCAL_IMAGE_PATH respectively).
-        '''
+        """
+
         model = load_model()
 
         df = get_top_features(model)

@@ -12,6 +12,8 @@ from scipy import stats, sparse
 import plotly.express as px
 import plotly.graph_objects as go
 
+from sklearn.feature_selection import chi2, SelectFpr, SelectFwe
+
 hex_colors = [mcolors.to_hex(color) for color in sns.diverging_palette(145, 300, s=60, n=5)]
 hex_colors.reverse()
 
@@ -46,7 +48,7 @@ def table_color(data:pd.Series, palette_min: int=145, palette_up: int=300, n: in
 
     Returns
     -------
-    list
+    cell_color : list
         Returns a list of the size of data and with each element being a color hexacode
     """
     hex_colors = [mcolors.to_hex(color) for color in sns.diverging_palette(palette_min, palette_up, s=60, n=n)]
@@ -69,8 +71,10 @@ def line_adder(h_coord=0.5, color="black", linestyle="-", *args):
 def custom_combiner(feature, category):
     """
     A convenience function that can be used in sklearn's ohe to format column names.
-    Requires sklearn version >= 1.3.0
 
+    Used only in build pipelines in model_ML.py
+    
+    Requires sklearn version >= 1.3.0
     """
     return str(category)
 
@@ -102,7 +106,7 @@ def get_top_features(model, has_selector: bool= True, top_n: int= 25, how: str= 
 
     Returns
     -------
-    pd.DataFrame
+    df_lambda : pd.DataFrame
         Output dataframe with rows being each one of the top_n most important coef with its respective value
     """
 
@@ -152,7 +156,7 @@ def get_top_features(model, has_selector: bool= True, top_n: int= 25, how: str= 
     return df_lambda
 
 
-def plot_confusion_matrix(y_true: np.array, y_pred: np.array, width= 400, height= 400) -> px.imshow:
+def plot_confusion_matrix(y_true: np.array, y_pred: np.array, width= 400, height= 400) -> go.Figure:
     """
     Convenience function to print a confusion matrix with the predicted results y_pred
 
@@ -169,7 +173,7 @@ def plot_confusion_matrix(y_true: np.array, y_pred: np.array, width= 400, height
 
     Returns
     -------
-    px.imshow
+    fig : go.Figure
         A confusion matrix of the model's result
     """
     labels = sorted(list(set(y_true)))
@@ -212,7 +216,7 @@ def plot_confusion_matrix(y_true: np.array, y_pred: np.array, width= 400, height
     return fig
 
 
-def model_explainer(df: pd.DataFrame, x: str= "coef", y: str= "feature")-> px.bar:
+def model_explainer(df: pd.DataFrame, x: str= "coef", y: str= "feature")-> go.Figure:
     """
     A function that takes the dataframe outputed by get_top_features() and creates a barplot of most important features using Plotly
 
@@ -227,8 +231,8 @@ def model_explainer(df: pd.DataFrame, x: str= "coef", y: str= "feature")-> px.ba
 
     Returns
     -------
-    px.bar
-        A bar graph showing the most important coeficients and their values
+    fig : go.Figure
+        A plotly bar graph showing the most important coeficients and their values
     """
 
     colors = px.colors.qualitative.Dark24[:20]
@@ -263,13 +267,13 @@ def model_dl_examiner(train: np.ndarray, val: np.ndarray) -> go.Figure:
     Parameters
     ----------
     train : np.ndarray
-        The history of train losses
+        The history of train losses from a trained model
     val : np.ndarray
-        The history of val losses
+        The history of val losses from a trained model
 
     Returns
     -------
-    go.Figure
+    fig : go.Figure
         A plotly line chart
     """
 
@@ -302,16 +306,22 @@ def model_dl_examiner(train: np.ndarray, val: np.ndarray) -> go.Figure:
 
 def auc_cross_val(test_array: list, pred_array: list, n_splits: int= 5):
     """
-    _summary_
+    A function to produce a figure with several ROC curves when cross-validating a model
 
     Parameters
     ----------
     test_array : list
-        _description_
+        A list of lists with the actual values for each fold
     pred_array : list
-        _description_
+        A list of lists with the predicted values for each fold
     n_splits : int, optional
-        _description_, by default 5
+        Number of folds by cv, by default 5
+
+    Returns
+    -------
+    plt.Figure
+        A matplotlib figure
+
     """
 
     tprs = []
@@ -381,7 +391,7 @@ def params_combiner(classifier: str="logistic") -> dict:
     """
     A convenience function used to create the parameter dictionnary for hyperparameter tuning
 
-    Functions only with RandomizedSearchCV because of the use of scipy.stats
+    Functions only with RandomizedSearchCV because of the use of scipy.stats with a continuous distribution. 
 
     Parameters
     ----------
@@ -393,12 +403,21 @@ def params_combiner(classifier: str="logistic") -> dict:
     pipe_params : dict
         A full dictionnary of hyperparameters and potential values
     """
-    pipe_params = dict(preprocessing__text__selectkbest__k=np.arange(100, 2000 + 1, 100))
+
+    pipe_params = dict(preprocessing__text__selectkbest__k=np.arange(100, 2000 + 1, 100),
+                       preprocessing__text__selectkbest__score_func=[chi2, SelectFpr, SelectFwe],
+                       preprocessing__text__text_preprocessing__text1__ngram_range=[(1, 1), (1, 2), (1, 3)],
+                       preprocessing__text__text_preprocessing__text2__ngram_range=[(1, 1), (1, 2), (1, 3)],
+                       preprocessing__text__text_preprocessing__text3__ngram_range=[(1, 1), (1, 2), (1, 3)],
+                       preprocessing__text__text_preprocessing__text1__norm=["l1", "l2"],
+                       preprocessing__text__text_preprocessing__text2__norm=["l1", "l2"],
+                       preprocessing__text__text_preprocessing__text3__norm=["l1", "l2"]
+                       )
 
     if classifier == "logistic":
         params_log = dict(classifier__C=stats.uniform(loc=0, scale=5),
                           classifier__penalty=["l1", "l2"]
-                        )
+                          )
         pipe_params.update(params_log)
 
     elif classifier == "gbt":
@@ -408,6 +427,7 @@ def params_combiner(classifier: str="logistic") -> dict:
                           classifier__l2_regularization=stats.uniform(loc=0, scale=1)
                           )
         pipe_params.update(params_gbt)
+
     else:
         params_rf = dict(classifier__n_estimators=np.arange(50, 301, 10),
                           classifier__max_depth=np.arange(1, 5),
@@ -426,20 +446,19 @@ def params_extracter(model: object) -> dict:
 
     Parameters
     ----------
-    model : object
+    model : sklearn.pipeline
         A sklearn model or pipeline that has been cross-searched
 
     Returns
     -------
     dict
-        A dict of the best scores for the cross validation
+        A dict of the best scores for the cross validation in the order : AUC, accuracy, precision
     """
 
-    ind = model.cv_results_.get("mean_test_precision").argmax()
-    res = [key for key in model.cv_results_.keys() if "mean_test_" in key]
-    return {key[10:]: model.cv_results_.get(key)[ind] for key in res} #To remove mean_test_
+    ind = model.cv_results_.get("mean_test_precision").argmax() #Get the best results according to precision
+    return {key[10:]: model.cv_results_.get(key)[ind] for key in model.cv_results_.keys() if "mean_test_" in key} #[10:] is used to remove mean_test_, 
 
-def sparse_to_dense(X):
+def sparse_to_dense(X: sparse.csr_matrix) -> np.ndarray:
     """
     Convert a sparse matrix to a dense matrix.
 
@@ -453,6 +472,7 @@ def sparse_to_dense(X):
     {array-like, numpy.ndarray}
         A dense matrix if the input is sparse; otherwise, the input is returned unchanged.
     """
+
     if isinstance(X, sparse.csr_matrix):
         return X.toarray()
     else:
