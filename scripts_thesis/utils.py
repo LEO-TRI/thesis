@@ -199,7 +199,7 @@ def params_combiner(classifier: str="logistic") -> dict:
 
         )
 
-    else:
+    elif classifier == "random_forest":
         params_rf = dict(classifier__n_estimators=np.arange(50, 301, 10),
                           classifier__max_depth=np.arange(1, 5),
                           classifier__max_leaf_nodes=np.arange(20, 101),

@@ -18,7 +18,7 @@ sns.set_theme(context='notebook', style='darkgrid', palette='deep', rc= custom_p
 hex_colors = [mcolors.to_hex(color) for color in sns.diverging_palette(145, 300, s=60, n=5)]
 hex_colors.reverse()
 
-def plot_confusion_matrix(y_true: np.array, y_pred: np.array, width= 400, height= 400) -> go.Figure:
+def plot_confusion_matrix(y_true: np.array, y_pred: np.array, width= 600, height= 600) -> go.Figure:
     """
     Convenience function to print a confusion matrix with the predicted results y_pred
 
@@ -44,36 +44,42 @@ def plot_confusion_matrix(y_true: np.array, y_pred: np.array, width= 400, height
         index = labels,
         columns = labels
     )
-    total = np.sum(df_lambda, axis=1)
-    df_lambda = df_lambda/total
+    
+    df_lambda = df_lambda/len(y_true) #Get results as proportion of total results
     df_lambda = df_lambda.apply(lambda value : np.round(value, 2))
-
+    
     acc = accuracy_score(y_true, y_pred)
     f1s = f1_score(y_true, y_pred, average = 'weighted')
     precision = precision_score(y_true, y_pred, average = 'weighted')
 
-    fig = px.imshow(df_lambda, text_auto=True,
-                    color_continuous_scale='RdBu_r',
-                    labels=dict(x="Predicted", y="Actual", color="Proportion"),
-                    x=df_lambda.columns,
-                    y=df_lambda.index,
-                    title=f'Accuracy: {acc:.2f}, F1: {f1s:.2f}, Precision: {precision:.2f}',
-                    width=width, height=height)
-
+    fig = go.Figure()
+    
+    fig.add_trace(go.Heatmap(
+                   z=df_lambda.values,
+                   x=[str(col) for col in df_lambda.columns],
+                   y=[str(col) for col in df_lambda.columns],
+                   colorscale='RdBu_r',
+                   text=df_lambda.values,
+                   texttemplate="%{text}%",
+                   textfont={"size":16},
+                   colorbar=dict(title='Proportion'),
+                   hoverongaps = False)
+                   )
+    
     fig.update_layout(
-        title={
-            'y':0.88,
-            'x':0.5,
-            'xanchor': 'center',
-            'yanchor': 'top',
-            "font_family": "Arial",
-            "font_color": "black",
-            "font_size":14},
-        font_family="Arial",
-        font_color="black"
+        title=f'Confusion Matrix : Overall results <br><sup>Accuracy: {acc:.2f}, F1: {f1s:.2f}, Precision: {precision:.2f}</sup>', #<br> is a line break, and <sup> is superscript
+        xaxis=dict(title='Predicted'),
+        yaxis=dict(title='Actual'),
+        width=width,
+        height=height,
+        title_font=dict(
+            family='Arial',
+            color='black',
+            size=20
+        ),
+        font=dict(family='Arial', color='black')
         )
 
-    fig.show()
 
     return fig
 
@@ -98,7 +104,7 @@ def model_explainer(df: pd.DataFrame, x: str= "coef", y: str= "feature")-> go.Fi
     """
 
     colors = px.colors.qualitative.Dark24[:20]
-    template = 'SDG: %{customdata}<br>Feature: %{y}<br>Coefficient: %{x:.2f}'
+    template = 'CLF: %{customdata}<br>Feature: %{y}<br>Coefficient: %{x:.2f}'
 
     fig = px.bar(
         data_frame = df,
@@ -189,10 +195,10 @@ def auc_cross_val(test_array: list, pred_array: list, n_splits: int= 5):
     aucs = []
     mean_fpr = np.linspace(0, 1, 100)
 
+
     fig, ax = plt.subplots(figsize=(6, 6))
 
     for fold, (y_test, y_pred) in enumerate(zip(test_array, pred_array)):
-
 
         viz = RocCurveDisplay.from_predictions(
             y_test,
@@ -201,8 +207,10 @@ def auc_cross_val(test_array: list, pred_array: list, n_splits: int= 5):
             alpha=0.3,
             lw=1,
             ax=ax,
-            plot_chance_level=(fold == n_splits * 2 - 1),
-        )
+            #plot_chance_level=(fold == n_splits * 2 - 1)
+            )
+
+
         interp_tpr = np.interp(mean_fpr, viz.fpr, viz.tpr) # Interpolates additional points for the curve
         interp_tpr[0] = 0.0
         tprs.append(interp_tpr)
@@ -243,7 +251,7 @@ def auc_cross_val(test_array: list, pred_array: list, n_splits: int= 5):
     )
 
     ax.axis("square")
-    ax.legend(bbox_to_anchor=(1.75, 0.25), loc="lower right")
+    ax.legend(bbox_to_anchor=(1.65, 0.25), loc="lower right")
     plt.show()
 
     return fig
