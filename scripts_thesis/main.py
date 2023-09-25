@@ -8,7 +8,8 @@ from colorama import Fore, Style
 
 from scripts_thesis.data import DataLoader, LoadDataMixin
 from scripts_thesis.model_ML import train_model, evaluate_model, predict_model, load_model, tune_model
-from scripts_thesis.utils import get_top_features, model_explainer, plot_confusion_matrix, auc_cross_val, params_extracter
+from scripts_thesis.utils import get_top_features, params_extracter
+from scripts_thesis.graphs import model_explainer, plot_confusion_matrix, auc_cross_val
 
 from scripts_thesis.params import *
 from scripts_thesis.preproc import *
@@ -122,7 +123,7 @@ class ModelFlow(LoadDataMixin, DataLoader):
             The name of the column to use as feature, by default "license"
         classifiers : list[str], optional
             The classifier to use ('logistic', 'gbt', 'random_forest'), if None will test all, by default None
-            Must be passed as a list even if only one is passed.
+            Must be passed as a list even if only one classifier is passed.
 
         Returns
         -------
@@ -259,7 +260,7 @@ class ModelFlow(LoadDataMixin, DataLoader):
         y_pred : np.array
             An array of predicted values based on X_pred
         """
-        
+
         if X_pred is None:
             X_pred = self.pred_data #10 rows of the original data removed during preprocessing and never seen by the model. 
 

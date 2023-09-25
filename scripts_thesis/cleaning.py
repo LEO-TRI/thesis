@@ -10,6 +10,9 @@ import nltk
 from nltk.corpus import stopwords
 
 class SpacyClean:
+    """
+    Cleaning class built around 2 Spacy pipelines. 
+    """
 
     def __init__(self):
         #Creating 2 spacy models. 1 for French, 1 for English.
@@ -24,7 +27,8 @@ class SpacyClean:
 
     def preprocess_spacy(self, alpha: np.array) -> np.array:
         """
-        Function using Spacy to lemmatize the text. Discriminates between french and english text.
+        Function using Spacy to lemmatize the text. Discriminates between french and english texts.
+        
         Returns the lemmatized version of words when those words are NOUN, VERB and ADJ.
 
         Parameters
@@ -78,6 +82,23 @@ class CleanData:
 
 
     def remove_proper_nouns(self, text: str) -> str:
+        """
+        Cleans the text.
+
+        Remove punctuations and stopwords and proper nouns. 
+
+        Less accurate than SpacyClean.preprocess_spacy but a lot faster. 
+
+        Parameters
+        ----------
+        text : str
+            A text to be cleaned, in string format 
+
+        Returns
+        -------
+        filtered_text : str
+            A cleaned text, in string format
+        """
         sentences = nltk.sent_tokenize(text)
         filtered_sentences = []
         for sentence in sentences:
@@ -94,7 +115,10 @@ class CleanData:
 
 
     def clean(self, text: str) -> str:
-        """Simple cleaning function. To be used with a .map or vectorized.
+        """
+        Simple cleaning function. To be used with a .map or vectorized.
+
+        Lowers text, remove whitespace, digits and punctuations
 
         Parameters
         ----------
@@ -114,7 +138,9 @@ class CleanData:
 
 
     def clean_price(self, text: str) -> float:
-        """Function used to transform the price column from string to number.
+        """
+        Function used to transform the price column from string to number.
+        
         The function removes the dollar sign and rework the , vs . separating scheme.
 
         Parameters
