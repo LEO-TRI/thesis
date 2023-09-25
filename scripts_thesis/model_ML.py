@@ -44,7 +44,6 @@ def print_results(y_test: np.ndarray, y_pred: np.ndarray, verbose: bool= True, f
     fold: int
         The fold on which the data was train, by default None
 
-
     Returns
     -------
     dict
@@ -148,9 +147,9 @@ def build_pipeline(numeric_cols: list[str], text_cols: list[str], other_cols: li
 
     text_transformers = ColumnTransformer(
         transformers=[
-            ('text1', TfidfVectorizer(max_features=max_features_tfidf, ngram_range = (1, 3), max_df=0.8, norm="l1"), text_cols[0]),
-            ('text2', TfidfVectorizer(max_features=max_features_tfidf, ngram_range = (1, 3), max_df=0.8, norm="l1"), text_cols[1]),
-            ('text3', TfidfVectorizer(max_features=max_features_tfidf, ngram_range = (1, 3), max_df=0.8, norm="l1"), text_cols[2])
+            ('text1', TfidfVectorizer(max_features=max_features_tfidf, ngram_range = (1, 3), max_df=0.8, norm="l1", strip_accents="unicode"), text_cols[0]),
+            ('text2', TfidfVectorizer(max_features=max_features_tfidf, ngram_range = (1, 3), max_df=0.8, norm="l1", strip_accents="unicode"), text_cols[1]),
+            ('text3', TfidfVectorizer(max_features=max_features_tfidf, ngram_range = (1, 3), max_df=0.8, norm="l1", strip_accents="unicode"), text_cols[2])
             ],
         remainder='drop'  # Pass through any other columns not specified
         )
@@ -275,7 +274,7 @@ def train_model(X: pd.DataFrame, y: pd.Series, test_split: float=0.3, max_featur
     Returns
     -------
     Pipeline : imblearn.pipeline.Pipeline/sklearn.pipeline.Pipeline
-        A fitted pipeline obj
+        A fitted pipeline object
     res : pd.DataFrame
         A dataframe with the mean cross-validated metrics (4 in total + the fold number)
     """
