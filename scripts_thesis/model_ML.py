@@ -260,9 +260,9 @@ def tune_model(X: pd.DataFrame, y: pd.Series, max_features: int=1000, n_iter: in
     return rand_search
 
 
-def train_model(X: pd.DataFrame, y: pd.Series, test_split: float=0.3, max_features: int=1000, n_splits: int = 5) -> Pipeline:
+def train_model(X: pd.DataFrame, y: pd.Series, test_split: float=0.3, max_features: int=1000, n_splits: int = 5, classifier: str='logistic') -> Pipeline:
     """
-    Fit the passed model with the passed data and return a tuple (fitted_model, history)
+    Fit the passed model with the passed data and return a fitted model, a DataFrame of metrics and a tuple (y_test, y_pred) or (y_test, y_pred, y_proba)
 
     Parameters
     ----------
@@ -276,6 +276,9 @@ def train_model(X: pd.DataFrame, y: pd.Series, test_split: float=0.3, max_featur
         The max number of features for the tfidf vectorizer, by default 1000
     n_splits : int, optional
         The number of folds for the cross-val
+    classifier : str, optional
+        The classifier to use in the pipeline ('logistic', 'gbt', or 'random_forest', 'sgd' or 'stacked'), by default 'logistic'.
+
 
     Returns
     -------
@@ -283,13 +286,15 @@ def train_model(X: pd.DataFrame, y: pd.Series, test_split: float=0.3, max_featur
         A fitted pipeline object
     res : pd.DataFrame
         A dataframe with the mean cross-validated metrics (4 in total + the fold number)
+    tuple
+        A tuple with 2 or 3 elements, being y_test, y_pred and (optional when the model allows) y_proba
     """
 
     numeric_cols = X.select_dtypes(include=[np.number]).columns
     text_cols = ["amenities", "description", "host_about"]
     other_cols = list(set(X.columns) - set(numeric_cols) - set(text_cols))
 
-    pipe_model = build_pipeline(numeric_cols, text_cols, other_cols, max_features_tfidf = max_features)
+    pipe_model = build_pipeline(numeric_cols, text_cols, other_cols, max_features_tfidf = max_features, classifier=classifier)
 
     print(Fore.BLUE + "\nLaunching CV" + Style.RESET_ALL)
 
@@ -298,12 +303,21 @@ def train_model(X: pd.DataFrame, y: pd.Series, test_split: float=0.3, max_featur
     res = []
     pred_list = []
     test_list = []
+    proba_list = []
+
+    has_proba = True
+    if "classifier__loss" in pipe_model.get_params().keys(): #Filters for models that cannot produce probabilities estimates 
+        has_proba = False
 
     for fold, (train, test) in enumerate(cv.split(X, y)):
         start_time = time.time()  # Record the start time
         pipe_model.fit(X.loc[train,:], y[train])
         y_pred = pipe_model.predict(X.loc[test,:])
 
+        if has_proba:
+            y_proba = pipe_model.predict_proba(X.loc[test,:]) 
+            proba_list.append(y_proba)
+        
         res.append(print_results(y[test], y_pred, verbose=False, fold=fold))
 
         pred_list.append(y_pred)
@@ -323,6 +337,9 @@ def train_model(X: pd.DataFrame, y: pd.Series, test_split: float=0.3, max_featur
     print(f"✅ Model trained on \n {len(X_train)} original rows")
     print(f"Mean cross_validated accuracy: {round(np.mean(res['accuracy']), 2)}")
     print(f"Mean cross_validated precision: {round(np.mean(res['precision']), 2)}")
+
+    if has_proba:
+        return pipe_model, res, (pred_list, test_list, proba_list)
 
     return pipe_model, res, (pred_list, test_list)
 

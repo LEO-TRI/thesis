@@ -158,7 +158,7 @@ class ModelFlow(LoadDataMixin, DataLoader):
         return tuned_results.get(best_model_ind) #Return the best model
     
 
-    def train(self, file_name: str = None, target: str = "license", test_split: float = 0.3) -> None:
+    def train(self, file_name: str = None, target: str = "license", test_split: float = 0.3, classifier: str="logistic") -> None:
         """
         Load data from the data folder.
 
@@ -174,6 +174,8 @@ class ModelFlow(LoadDataMixin, DataLoader):
             The target y of the model, by default "license"
         test_split : float, optional
             The train test split, by default 0.3
+        classifier : str, optional
+            The classifier to use in the pipeline ('logistic', 'gbt', or 'random_forest', 'sgd' or 'stacked'), by default 'logistic'.
         """
 
         print(Fore.MAGENTA + "\n⭐️ Use case: train" + Style.RESET_ALL)
@@ -184,7 +186,7 @@ class ModelFlow(LoadDataMixin, DataLoader):
             return None
 
         print(Fore.MAGENTA + "\nTraining model..." + Style.RESET_ALL)
-        model, results, auc_metrics = train_model(X, y, test_split) #auc_metrics = (test_list, pred_list)
+        model, results, auc_metrics = train_model(X, y, test_split, classifier=classifier) #auc_metrics = (test_list, pred_list)
 
         model_iteration = len(os.listdir(LOCAL_MODEL_PATH)) + 1
         file_name = f'model_V{model_iteration}.pkl'

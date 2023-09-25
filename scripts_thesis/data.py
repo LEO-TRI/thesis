@@ -20,16 +20,24 @@ class GraphLoader:
         tmp_["c_quinsee"] = pd.to_numeric(tmp_["c_quinsee"])
         return tmp_
 
-    def get_data(self, graph: bool=True) -> pd.DataFrame:
+    def get_data(self, is_graph: bool=True) -> pd.DataFrame:
         """
-        This function returns a Python dict.
-        Its keys should be 'sellers', 'orders', 'order_items' etc...
-        Its values should be pandas.DataFrames loaded from csv files
+        This function returns a pd.DataFrame.
+
+        Parameters
+        ----------
+        is_graph : bool, optional
+            A boolean determining whether additional preprocessing will be done, by default True
+
+        Returns
+        -------
+        df_graph : pd.DataFrame
+            A DataFrame suitable for graphical exploration
         """
 
         df_graph = pd.read_parquet(os.path.join("data", 'df_merged_geo.parquet.gzip'))
 
-        if graph:
+        if is_graph:
             df_graph = df_graph.loc[:, ["id", "group", "group_count", "c_quinsee", "license",
                                 "room_type", "count_obj", "price", "description", "number_of_reviews",
                                 "first_review", "last_review", "minimum_nights", "review_scores_rating",
@@ -45,6 +53,20 @@ class GraphLoader:
         return df_graph
 
     def clean_data(self, graph: bool=True) -> pd.DataFrame:
+        """
+        This function returns a pd.DataFrame.
+
+        Parameters
+        ----------
+        is_graph : bool, optional
+            A boolean determining whether additional preprocessing will be done, by default True
+
+        Returns
+        -------
+        df_graph : pd.DataFrame
+            A DataFrame suitable for graphical exploration
+        """
+
         df_graph = self.get_data(graph=graph)
         df_graph["arr"] = df_graph["c_quinsee"].map(lambda row: str(row)[2:4])
 
@@ -54,6 +76,15 @@ class GraphLoader:
         return df_graph.loc[mask,:].reset_index(drop=True)
 
     def get_occupancy_rate(self) -> pd.DataFrame:
+        """
+        This function returns a pd.DataFrame using self.clean_data() and adds survival rates to it
+
+        Returns
+        -------
+        df_graph : pd.DataFrame
+            A DataFrame suitable for graphical exploration
+        """
+
         df_time = self.clean_data()
 
         df_time.loc[:, ["first_review", "last_review"]] = df_time[["first_review", "last_review"]].apply(pd.to_datetime, axis=0)
@@ -71,6 +102,14 @@ class GraphLoader:
         return df_time
 
     def get_neighourhood(self) -> pd.DataFrame:
+        """
+        This function returns a pd.DataFrame using self.clean_data() and adds geopgraphical data using self.get_geodata()
+
+        Returns
+        -------
+        pd.DataFrame
+            A DataFrame suitable for graphical exploration
+        """
         df_graph = self.clean_data()
         df_geo = self.get_geodata()
 
@@ -122,8 +161,17 @@ class GraphLoader:
 
 ###Cleaning raw data###
 class DataLoader:
+    """
+    A class centralising data loading methods
+    """
 
     def __init__(self, path: str = LOCAL_RAW_PATH):
+        """
+        Parameters
+        ----------
+        path : str, optional
+            The path of the raw data file, by default LOCAL_RAW_PATH stored in params.py
+        """
         self.path = path
 
     def load_folder(self, path: str = None) -> [pd.DataFrame]:
