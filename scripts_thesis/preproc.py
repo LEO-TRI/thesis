@@ -31,7 +31,6 @@ def column_selector(df: pd.DataFrame) -> list:
     return drop_list
 
 def text_selector(df:pd.DataFrame)-> pd.DataFrame:
-
     df["host_about"] = df["host_about"].replace(np.nan, "")
     df["mask"] = df["host_about"].map(lambda row: len(row))
 
