@@ -76,7 +76,7 @@ def baseline_model(y: np.ndarray, test_split: float=0.3) -> np.ndarray:
 
     Produces two baseline, one coming from a random guess and the other from predicting only the majority class
 
-    sParameters
+    Parameters
     ----------
     y : np.ndarray/array_like
         The target feature
