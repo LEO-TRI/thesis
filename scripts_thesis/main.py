@@ -198,7 +198,7 @@ class ModelFlow(LoadDataMixin, DataLoader):
 
         file_name = f'auc_curve_{model_iteration}'
         full_file_path = os.path.join(LOCAL_IMAGE_PATH, file_name)
-        fig =  auc_cross_val(auc_metrics[0], auc_metrics[1])
+        fig =  auc_cross_val(auc_metrics)
         fig.savefig(fname=full_file_path, format="png")
 
 

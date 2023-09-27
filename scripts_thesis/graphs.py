@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import seaborn as sns
 
-from sklearn.metrics import accuracy_score, f1_score, confusion_matrix, precision_score, RocCurveDisplay, auc
+from sklearn.metrics import accuracy_score, f1_score, confusion_matrix, precision_score, RocCurveDisplay, auc, roc_curve
 
 from scripts_thesis.utils import *
 
@@ -171,16 +171,14 @@ def model_dl_examiner(train: np.ndarray, val: np.ndarray) -> go.Figure:
 
     fig.show()
 
-def auc_cross_val(test_array: list, pred_array: list, n_splits: int= 5):
+def auc_cross_val(auc_metrics: tuple, n_splits: int= 5):
     """
     A function to produce a figure with several ROC curves when cross-validating a model
 
     Parameters
     ----------
-    test_array : list
-        A list of lists with the actual values for each fold
-    pred_array : list
-        A list of lists with the predicted values for each fold
+    auc_metrics : tuple
+        A tuple containing lists of lists for respectively y_test, y_pred and y_pred proba by cv fold
     n_splits : int, optional
         Number of folds by cv, by default 5
 
@@ -191,14 +189,39 @@ def auc_cross_val(test_array: list, pred_array: list, n_splits: int= 5):
 
     """
 
+    if len(auc_metrics) == 2:
+        test_array, pred_array = auc_metrics
+        target_array = pred_array
+
+    elif len(auc_metrics) == 3:
+        test_array, pred_array, proba_array = auc_metrics
+        target_array = proba_array
+
     tprs = []
     aucs = []
     mean_fpr = np.linspace(0, 1, 100)
 
-
     fig, ax = plt.subplots(figsize=(6, 6))
 
-    for fold, (y_test, y_pred) in enumerate(zip(test_array, pred_array)):
+    fig = go.Figure()
+
+    for fold, (y_test, y_pred) in enumerate(zip(test_array, target_array)):
+        
+        fpr, tpr, thresholds = roc_curve(y_test, y_pred, pos_label=1)
+        roc_auc = auc(fpr, tpr)
+
+        fig.add_trace(go.Scatter(x=fpr,
+                                 y=tpr,
+                                 mode='lines',
+                                 name=f"ROC fold {1 + fold // n_splits} - {fold % n_splits + 1} - AUC = {roc_auc:0.2f})"
+                                 )
+        )
+        
+        interp_tpr = np.interp(mean_fpr, fpr, tpr) # Interpolates additional points for the curve
+        interp_tpr[0] = 0.0
+        tprs.append(interp_tpr)
+        aucs.append(roc_auc)
+
 
         viz = RocCurveDisplay.from_predictions(
             y_test,
@@ -210,17 +233,18 @@ def auc_cross_val(test_array: list, pred_array: list, n_splits: int= 5):
             #plot_chance_level=(fold == n_splits * 2 - 1)
             )
 
-
-        interp_tpr = np.interp(mean_fpr, viz.fpr, viz.tpr) # Interpolates additional points for the curve
-        interp_tpr[0] = 0.0
-        tprs.append(interp_tpr)
-        aucs.append(viz.roc_auc)
-
-
     mean_tpr = np.mean(tprs, axis=0)
     mean_tpr[-1] = 1.0
     mean_auc = auc(mean_fpr, mean_tpr)
     std_auc = np.std(aucs)
+
+    fig.add_trace(go.Scatter(x=mean_fpr,
+                                 y=mean_tpr,
+                                 mode='lines',
+                                 name=r"Mean ROC (AUC = %0.2f $\pm$ %0.2f)" % (mean_auc, std_auc)
+                                 )
+        )
+    
     ax.plot(
         mean_fpr,
         mean_tpr,
@@ -230,9 +254,27 @@ def auc_cross_val(test_array: list, pred_array: list, n_splits: int= 5):
         alpha=0.8,
     )
 
+
+    #Adding a confidence interval
     std_tpr = np.std(tprs, axis=0)
     tprs_upper = np.minimum(mean_tpr + std_tpr, 1)
     tprs_lower = np.maximum(mean_tpr - std_tpr, 0)
+
+    fig.add_trace(go.Scatter(x=mean_fpr,
+                                 y=tprs_upper,
+                                 mode='lines',
+                                 line_color='grey'
+                                 )
+        )
+    fig.add_trace(go.Scatter(x=mean_fpr,
+                                 y=tprs_lower,
+                                 mode='lines',
+                                 fill='tonexty',
+                                 )
+        )
+    
+    fig.update_layout()
+
     ax.fill_between(
         mean_fpr,
         tprs_lower,

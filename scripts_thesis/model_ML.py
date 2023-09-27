@@ -183,11 +183,11 @@ def build_pipeline(numeric_cols: list[str], text_cols: list[str], other_cols: li
     #('smote', SMOTE(random_state=42, k_neighbors=20)),
 
     #Add the "head" of the pipeline from the potential classifiers
-    classifiers = dict(logistic= LogisticRegression(penalty='l2', C=0.9, class_weight='balanced', random_state=1830, solver='liblinear', max_iter=1000),
+    classifiers = dict(logistic= LogisticRegression(penalty='l2', C=0.9, random_state=1830, solver='liblinear', max_iter=1000),
                        gbt= HistGradientBoostingClassifier(random_state=1830),
                        random_forest= RandomForestClassifier(random_state=1830, class_weight="balanced"),
                        sgd= SGDClassifier(random_state=1830, eta0=1),
-                       xgb=xgb.XGBClassifier(random_state =1830)
+                       xgb=xgb.XGBClassifier(random_state=1830, tree_method="hist")
                        )
 
 
@@ -196,12 +196,12 @@ def build_pipeline(numeric_cols: list[str], text_cols: list[str], other_cols: li
                       ("gbt", classifiers.get("gbt")),
                       ("sgd", classifiers.get("sgd"))
                       ]
-        clf = StackingClassifier(estimators=estimators, final_estimator=LogisticRegression())
+        clf = StackingClassifier(estimators=estimators, final_estimator=LogisticRegression(random_state=1830))
         classifiers[classifier] = clf
 
     classifier_model = classifiers.get(classifier, None)
     if classifier not in classifiers.keys():
-        raise ValueError("Invalid classifier name. Choose 'logistic', 'gbt', 'random_forest', 'sgd' or 'stacked'.")
+        raise ValueError("Invalid classifier name. Choose 'logistic', 'gbt', 'random_forest', 'sgd', 'xgb' or 'stacked'.")
 
     if (classifier == "gbt") | (classifier == 'stacked'): #Adding an additional step for classifiers that require dense array
         sparse_to_dense_transformer = FunctionTransformer(func=sparse_to_dense, validate=False)
@@ -317,14 +317,14 @@ def train_model(X: pd.DataFrame, y: pd.Series, test_split: float=0.3, max_featur
         pipe_model.fit(X.loc[train,:], y[train])
         y_pred = pipe_model.predict(X.loc[test,:])
 
-        if has_proba:
-            y_proba = pipe_model.predict_proba(X.loc[test,:])
-            proba_list.append(y_proba)
-
         res.append(print_results(y[test], y_pred, verbose=False, fold=fold))
 
         pred_list.append(y_pred)
         test_list.append(y[test])
+
+        if has_proba:
+            y_proba = pipe_model.predict_proba(X.loc[test,:])
+            proba_list.append(y_proba)
 
         end_time = time.time()  # Record the end time
         elapsed_time = end_time - start_time  # Calculate elapsed time
