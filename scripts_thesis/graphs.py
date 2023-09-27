@@ -18,7 +18,7 @@ sns.set_theme(context='notebook', style='darkgrid', palette='deep', rc= custom_p
 hex_colors = [mcolors.to_hex(color) for color in sns.diverging_palette(145, 300, s=60, n=5)]
 hex_colors.reverse()
 
-def plot_confusion_matrix(y_true: np.array, y_pred: np.array, width= 600, height= 600) -> go.Figure:
+def plot_confusion_matrix(y_true: np.ndarray, y_pred: np.ndarray, width= 600, height= 600) -> go.Figure:
     """
     Convenience function to print a confusion matrix with the predicted results y_pred
 
