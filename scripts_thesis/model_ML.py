@@ -4,8 +4,9 @@ from sklearn.experimental import enable_iterative_imputer
 from sklearn.impute import IterativeImputer
 from sklearn.model_selection import train_test_split, RepeatedStratifiedKFold, RandomizedSearchCV
 from sklearn.metrics import accuracy_score, precision_score, f1_score, recall_score, classification_report, make_scorer
-from sklearn.ensemble import HistGradientBoostingClassifier , RandomForestClassifier, StackingClassifier
 
+from sklearn.naive_bayes import GaussianNB
+from sklearn.ensemble import HistGradientBoostingClassifier , RandomForestClassifier, StackingClassifier
 from sklearn.linear_model import LogisticRegression, SGDClassifier
 from sklearn.feature_selection import SelectKBest, chi2
 from sklearn.preprocessing import RobustScaler, OneHotEncoder, FunctionTransformer
@@ -183,20 +184,22 @@ def build_pipeline(numeric_cols: list[str], text_cols: list[str], other_cols: li
     #('smote', SMOTE(random_state=42, k_neighbors=20)),
 
     #Add the "head" of the pipeline from the potential classifiers
-    classifiers = dict(logistic= LogisticRegression(penalty='l2', C=0.9, random_state=1830, solver='liblinear', max_iter=1000),
+    classifiers = dict(logistic= LogisticRegression(penalty='l2', C=0.9, random_state=1830, solver='liblinear', max_iter=1000, class_weight="balanced"),
                        gbt= HistGradientBoostingClassifier(random_state=1830),
                        random_forest= RandomForestClassifier(random_state=1830, class_weight="balanced"),
-                       sgd= SGDClassifier(random_state=1830, eta0=1),
-                       xgb=xgb.XGBClassifier(random_state=1830, tree_method="hist")
+                       sgd= SGDClassifier(random_state=1830, max_iter=1000),
+                       xgb=xgb.XGBClassifier(random_state=1830, tree_method="hist"),
+                       gNB = GaussianNB()
                        )
 
     if classifier == "stacked":
         estimators = [('rf', classifiers.get("random_forest")),
                       ("gbt", classifiers.get("gbt")),
-                      ("sgd", classifiers.get("sgd"))
+                      ("gNB", classifiers.get("gNB"))
                       ]
-        clf = StackingClassifier(estimators=estimators, final_estimator=LogisticRegression(random_state=1830))
-        classifiers[classifier] = clf
+
+        clf = StackingClassifier(estimators=estimators, final_estimator=classifiers.get("logistic"))
+        classifiers[classifier] = clf #Adding the stacked classifier to the dict of classifiers
 
     classifier_model = classifiers.get(classifier, None)
     if classifier not in classifiers.keys():
@@ -257,8 +260,8 @@ def tune_model(X: pd.DataFrame, y: pd.Series, max_features: int=1000, n_iter: in
                                      random_state=1830,
                                      verbose=1)
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.8, random_state=1830)
-    rand_search.fit(X_train, y_train)
+    rand_search.fit(X, y)
+
     print(Fore.BLUE + f"Precision for {classifier} is : {np.round(rand_search.best_score_, 2)}\n" + Style.RESET_ALL )
 
     return rand_search

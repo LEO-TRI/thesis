@@ -18,7 +18,7 @@ sns.set_theme(context='notebook', style='darkgrid', palette='deep', rc= custom_p
 hex_colors = [mcolors.to_hex(color) for color in sns.diverging_palette(145, 300, s=60, n=5)]
 hex_colors.reverse()
 
-def plot_confusion_matrix(y_true: np.array, y_pred: np.array, width= 600, height= 600) -> go.Figure:
+def plot_confusion_matrix(y_true: np.ndarray, y_pred: np.ndarray, width: int= 600, height: int= 600) -> go.Figure:
     """
     Convenience function to print a confusion matrix with the predicted results y_pred
 
@@ -44,16 +44,16 @@ def plot_confusion_matrix(y_true: np.array, y_pred: np.array, width= 600, height
         index = labels,
         columns = labels
     )
-    
+
     df_lambda = df_lambda/len(y_true) #Get results as proportion of total results
     df_lambda = df_lambda.apply(lambda value : np.round(value, 2))
-    
+
     acc = accuracy_score(y_true, y_pred)
     f1s = f1_score(y_true, y_pred, average = 'weighted')
     precision = precision_score(y_true, y_pred, average = 'weighted')
 
     fig = go.Figure()
-    
+
     fig.add_trace(go.Heatmap(
                    z=df_lambda.values,
                    x=[str(col) for col in df_lambda.columns],
@@ -65,7 +65,7 @@ def plot_confusion_matrix(y_true: np.array, y_pred: np.array, width= 600, height
                    colorbar=dict(title='Proportion'),
                    hoverongaps = False)
                    )
-    
+
     fig.update_layout(
         title=f'Confusion Matrix : Overall results <br><sup>Accuracy: {acc:.2f}, F1: {f1s:.2f}, Precision: {precision:.2f}</sup>', #<br> is a line break, and <sup> is superscript
         xaxis=dict(title='Predicted'),
@@ -79,7 +79,6 @@ def plot_confusion_matrix(y_true: np.array, y_pred: np.array, width= 600, height
         ),
         font=dict(family='Arial', color='black')
         )
-
 
     return fig
 
@@ -171,6 +170,110 @@ def model_dl_examiner(train: np.ndarray, val: np.ndarray) -> go.Figure:
 
     fig.show()
 
+def _auc_curve(test_array: np.ndarray, target_array: np.ndarray, n_splits: int) -> go.Figure:
+    """
+    A function used to calculate cross_validated auc.
+
+    Used as part of auc_cross_val
+
+    Parameters
+    ----------
+    test_array : np.ndarray
+        The array of test values
+    target_array : np.ndarray
+        The array of predicted values, can be binary or probabilities
+    n_splits : int
+        Number of splits in the cross validation
+
+    Returns
+    -------
+    fig : go.Figure
+        The cross validated AUC curves
+    """
+
+    tprs = []
+    aucs = []
+    mean_fpr = np.linspace(0, 1, 100)
+
+    fig = go.Figure()
+
+    for fold, (y_test, y_pred) in enumerate(zip(test_array, target_array)):
+
+        fpr, tpr, thresholds = roc_curve(y_test, y_pred, pos_label=1)
+        roc_auc = auc(fpr, tpr)
+
+        fig.add_trace(go.Scatter(x=fpr,
+                                 y=tpr,
+                                 opacity=0.3,
+                                 mode='lines',
+                                 name=f"ROC fold {1 + fold // n_splits} - {fold % n_splits + 1} - AUC = {roc_auc:0.2f}"
+                                 )
+                      )
+
+        interp_tpr = np.interp(mean_fpr, fpr, tpr) # Interpolates additional points for the curve
+        interp_tpr[0] = 0.0
+        tprs.append(interp_tpr)
+        aucs.append(roc_auc)
+
+    mean_tpr = np.mean(tprs, axis=0)
+    mean_tpr[-1] = 1.0
+    mean_auc = auc(mean_fpr, mean_tpr)
+    #std_auc = np.std(aucs)
+
+    fig.add_trace(go.Scatter(x=mean_fpr,
+                                 y=mean_tpr,
+                                 mode='lines',
+                                 line = dict(color=hex_colors[-1], width=2, dash='dot'),
+                                 name=f"Mean ROC (AUC = {np.round(mean_auc, 2)})"
+                                 )
+                  )
+
+    fig.add_trace(go.Scatter(x=[0, 1],
+                             y=[0, 1],
+                             mode='lines',
+                             name="Chance Level - AUC = 0.50",
+                             line = dict(color=hex_colors[0], width=2, dash='dash'),
+                             )
+                  )
+
+    #Adding a confidence interval
+    std_tpr = np.std(tprs, axis=0)
+    tprs_upper = np.minimum(mean_tpr + std_tpr, 1)
+    tprs_lower = np.maximum(mean_tpr - std_tpr, 0)
+
+    fig.add_trace(go.Scatter(x=mean_fpr,
+                                 y=tprs_upper,
+                                 mode='lines',
+                                 line_color='grey',
+                                 name="Lower std bound",
+                                 showlegend=False
+                                 )
+        )
+    fig.add_trace(go.Scatter(x=mean_fpr,
+                                 y=tprs_lower,
+                                 mode='lines',
+                                 fill='tonexty',
+                                 line_color='grey',
+                                 name="CI interval"
+                                 )
+        )
+
+    fig.update_layout(
+        xaxis=dict(range=[-0.05, 1.05], title="False Positive Rate"),
+        yaxis=dict(range=[-0.05, 1.05], title="True Positive Rate"),
+        title="ROC curves with variability\n (CV)",
+        legend=dict(yanchor="bottom",
+                    y=0.0,
+                    xanchor="right",
+                    x=0.99,
+                    )
+        )
+
+    fig.show()
+
+    return fig
+
+
 def auc_cross_val(auc_metrics: tuple, n_splits: int= 5):
     """
     A function to produce a figure with several ROC curves when cross-validating a model
@@ -184,116 +287,15 @@ def auc_cross_val(auc_metrics: tuple, n_splits: int= 5):
 
     Returns
     -------
-    plt.Figure
-        A matplotlib figure
-
+    tuple
+        A tuple containing one or two plotly graphs depending on the type of classifiers used
     """
 
     if len(auc_metrics) == 2:
         test_array, pred_array = auc_metrics
-        target_array = pred_array
+        return (_auc_curve(test_array, pred_array, n_splits=n_splits), None) #A half empty tuple
 
     elif len(auc_metrics) == 3:
         test_array, pred_array, proba_array = auc_metrics
-        target_array = proba_array
-
-    tprs = []
-    aucs = []
-    mean_fpr = np.linspace(0, 1, 100)
-
-    fig, ax = plt.subplots(figsize=(6, 6))
-
-    fig = go.Figure()
-
-    for fold, (y_test, y_pred) in enumerate(zip(test_array, target_array)):
-        
-        fpr, tpr, thresholds = roc_curve(y_test, y_pred, pos_label=1)
-        roc_auc = auc(fpr, tpr)
-
-        fig.add_trace(go.Scatter(x=fpr,
-                                 y=tpr,
-                                 mode='lines',
-                                 name=f"ROC fold {1 + fold // n_splits} - {fold % n_splits + 1} - AUC = {roc_auc:0.2f})"
-                                 )
-        )
-        
-        interp_tpr = np.interp(mean_fpr, fpr, tpr) # Interpolates additional points for the curve
-        interp_tpr[0] = 0.0
-        tprs.append(interp_tpr)
-        aucs.append(roc_auc)
-
-
-        viz = RocCurveDisplay.from_predictions(
-            y_test,
-            y_pred,
-            name=f"ROC fold {1 + fold // n_splits} - {fold % n_splits + 1}",
-            alpha=0.3,
-            lw=1,
-            ax=ax,
-            #plot_chance_level=(fold == n_splits * 2 - 1)
-            )
-
-    mean_tpr = np.mean(tprs, axis=0)
-    mean_tpr[-1] = 1.0
-    mean_auc = auc(mean_fpr, mean_tpr)
-    std_auc = np.std(aucs)
-
-    fig.add_trace(go.Scatter(x=mean_fpr,
-                                 y=mean_tpr,
-                                 mode='lines',
-                                 name=r"Mean ROC (AUC = %0.2f $\pm$ %0.2f)" % (mean_auc, std_auc)
-                                 )
-        )
-    
-    ax.plot(
-        mean_fpr,
-        mean_tpr,
-        color="b",
-        label=r"Mean ROC (AUC = %0.2f $\pm$ %0.2f)" % (mean_auc, std_auc),
-        lw=2,
-        alpha=0.8,
-    )
-
-
-    #Adding a confidence interval
-    std_tpr = np.std(tprs, axis=0)
-    tprs_upper = np.minimum(mean_tpr + std_tpr, 1)
-    tprs_lower = np.maximum(mean_tpr - std_tpr, 0)
-
-    fig.add_trace(go.Scatter(x=mean_fpr,
-                                 y=tprs_upper,
-                                 mode='lines',
-                                 line_color='grey'
-                                 )
-        )
-    fig.add_trace(go.Scatter(x=mean_fpr,
-                                 y=tprs_lower,
-                                 mode='lines',
-                                 fill='tonexty',
-                                 )
-        )
-    
-    fig.update_layout()
-
-    ax.fill_between(
-        mean_fpr,
-        tprs_lower,
-        tprs_upper,
-        color="grey",
-        alpha=0.2,
-        label=r"$\pm$ 1 std. dev.",
-    )
-
-    ax.set(
-        xlim=[-0.05, 1.05],
-        ylim=[-0.05, 1.05],
-        xlabel="False Positive Rate",
-        ylabel="True Positive Rate",
-        title="Mean ROC curve with variability\n (Positive label)",
-    )
-
-    ax.axis("square")
-    ax.legend(bbox_to_anchor=(1.65, 0.25), loc="lower right")
-    plt.show()
-
-    return fig
+        proba_array = [arr[:, 1] for arr in proba_array]
+        return (_auc_curve(test_array, proba_array, n_splits=n_splits), _auc_curve(test_array, pred_array, n_splits=n_splits))
