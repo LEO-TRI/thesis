@@ -177,38 +177,45 @@ def params_combiner(classifier: str="logistic") -> dict:
                        )
 
     if classifier == "logistic":
-        params_log = dict(classifier__C=stats.uniform(loc=0, scale=5),
+        params_clf = dict(classifier__C=stats.uniform(loc=0, scale=5),
                           classifier__penalty=["l1", "l2"]
                           )
-        pipe_params.update(params_log)
 
     elif classifier == "gbt":
-        params_gbt = dict(classifier__learning_rate=stats.uniform(loc=0, scale=1),
+        params_clf = dict(classifier__learning_rate=stats.uniform(loc=0, scale=1),
                           classifier__max_depth=np.arange(1, 5),
                           classifier__max_leaf_nodes=np.arange(5, 60),
-                          classifier__l2_regularization=stats.uniform(loc=0, scale=1)
+                          classifier__l2_regularization=stats.uniform(loc=0, scale=1),
+                          classifier__max_bins=np.arange(50, 256)
                           )
-        pipe_params.update(params_gbt)
 
     elif classifier == "sgd":
-        params_sdg = dict(classifier__penalty=["l1", "l2"],
+        params_clf = dict(classifier__penalty=["l1", "l2"],
                           classifier__alpha=stats.uniform(loc=0, scale=1),
                           classifier__learning_rate=["constant", "optimal"],
                           classifier__loss=["hinge", "squared_hinge", "perceptron"]
-
         )
 
     elif classifier == "random_forest":
-        params_rf = dict(classifier__n_estimators=np.arange(50, 301, 10),
+        params_clf = dict(classifier__n_estimators=np.arange(50, 301, 10),
                           classifier__max_depth=np.arange(1, 5),
                           classifier__max_leaf_nodes=np.arange(20, 101),
                           classifier__min_samples_split =np.arange(2, 50),
                           classifier__min_samples_leaf=np.arange(1, 50),
                           classifier__max_features=["log2", "sqrt"],
                           )
-        pipe_params.update(params_rf)
-
-    return pipe_params
+        
+    elif classifier == "xgb":
+        params_clf = dict(classifier__n_estimators=np.arange(10, 101, 5),
+                          classifier__max_depth=np.arange(1, 5),
+                          classifier__grow_policy=[0, 1],
+                          classifier__learning_rate=stats.uniform(loc=0, scale=1),
+                          classifier__booster =["gbtree", "gblinear", "dart"],
+                          classifier__max_bins=np.arange(50, 256),
+                          classifier__reg_alpha=stats.uniform(loc=0, scale=1)
+                          )
+    
+    return pipe_params.update(params_clf)
 
 def params_extracter(model: object) -> dict:
     """
