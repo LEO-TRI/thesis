@@ -190,7 +190,6 @@ def build_pipeline(numeric_cols: list[str], text_cols: list[str], other_cols: li
                        xgb=xgb.XGBClassifier(random_state=1830, tree_method="hist")
                        )
 
-
     if classifier == "stacked":
         estimators = [('rf', classifiers.get("random_forest")),
                       ("gbt", classifiers.get("gbt")),
@@ -243,6 +242,7 @@ def tune_model(X: pd.DataFrame, y: pd.Series, max_features: int=1000, n_iter: in
     pipe_model = build_pipeline(numeric_cols, text_cols, other_cols, max_features_tfidf = max_features, classifier=classifier)
 
     pipe_params = params_combiner(classifier=classifier)
+
     scoring = dict(AUC="roc_auc",
                    accuracy=make_scorer(accuracy_score),
                    precision=make_scorer(precision_score)
@@ -257,7 +257,8 @@ def tune_model(X: pd.DataFrame, y: pd.Series, max_features: int=1000, n_iter: in
                                      random_state=1830,
                                      verbose=1)
 
-    rand_search.fit(X, y)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, train_size=0.8, random_state=1830)
+    rand_search.fit(X_train, y_train)
     print(Fore.BLUE + f"Precision for {classifier} is : {np.round(rand_search.best_score_, 2)}\n" + Style.RESET_ALL )
 
     return rand_search

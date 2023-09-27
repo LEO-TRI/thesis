@@ -204,18 +204,20 @@ def params_combiner(classifier: str="logistic") -> dict:
                           classifier__min_samples_leaf=np.arange(1, 50),
                           classifier__max_features=["log2", "sqrt"],
                           )
-        
+
     elif classifier == "xgb":
         params_clf = dict(classifier__n_estimators=np.arange(10, 101, 5),
                           classifier__max_depth=np.arange(1, 5),
-                          classifier__grow_policy=[0, 1],
+                          #classifier__grow_policy=[0, 1],
                           classifier__learning_rate=stats.uniform(loc=0, scale=1),
                           classifier__booster =["gbtree", "gblinear", "dart"],
                           classifier__max_bins=np.arange(50, 256),
                           classifier__reg_alpha=stats.uniform(loc=0, scale=1)
                           )
-    
-    return pipe_params.update(params_clf)
+
+    pipe_params.update(params_clf)
+
+    return pipe_params
 
 def params_extracter(model: object) -> dict:
     """

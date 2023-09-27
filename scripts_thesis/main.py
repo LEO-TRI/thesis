@@ -3,6 +3,7 @@ import pandas as pd
 from datetime import datetime
 import os
 import pickle
+import json
 
 from colorama import Fore, Style
 
@@ -144,7 +145,7 @@ class ModelFlow(LoadDataMixin, DataLoader):
         print(Fore.MAGENTA + f"\nTuning {len(classifiers)} model(s)..." + Style.RESET_ALL)
 
         tuned_results = {key: tune_model(X, y, n_iter=n_iter, classifier=key) for key in classifiers} #Test the pipeline with hyperparameters for three potential classifiers
-        tuned_results = {key: list(model.best_estimator_, params_extracter(model), model) for key, model in tuned_results.items()} #Extract the best results, and parameters from the fitted pipelines
+        tuned_results = {key: [model.best_params_, params_extracter(model), model] for key, model in tuned_results.items()} #Extract the best results, and parameters from the fitted pipelines
         tuned_results = {key: value for key, value in sorted(tuned_results.items(), key= lambda x : x[1][1].get("precision"), reverse=True)}
 
         print(Fore.MAGENTA + "Models' results are:" + Style.RESET_ALL)
@@ -152,7 +153,17 @@ class ModelFlow(LoadDataMixin, DataLoader):
             tuned_results.get(key)[1] = {key: np.round(value, 2) for key, value in tuned_results.get(key)[1].items()}
             print(f"{key} : {tuned_results.get(key)[1]}\n")
 
-        best_model_ind = list(tuned_results.keys())[0] #Select the index of the best model
+        best_model_ind = list(tuned_results.keys())[0] #Select the key of the best model
+
+        model_iteration = len(os.listdir(LOCAL_MODEL_PATH)) + 1
+        file_name = f'model_train_{best_model_ind}_V{model_iteration}'
+        full_file_path = os.path.join(LOCAL_MODEL_PATH, file_name)
+
+        print(tuned_results.get(best_model_ind)[0])
+        print(type(tuned_results.get(best_model_ind)[0]))
+
+        with open(full_file_path, 'wb') as f:
+            pickle.dump(tuned_results.get(best_model_ind)[0], f)
 
         return tuned_results.get(best_model_ind) #Return the best model
 
