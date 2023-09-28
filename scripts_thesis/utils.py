@@ -150,7 +150,7 @@ def get_top_features(model, has_selector: bool= True, top_n: int= 25, how: str= 
 
     return df_lambda
 
-def params_combiner(classifier: str="logistic") -> dict:
+def params_combiner(classifier: str="logistic", params_clf: dict= None) -> dict:
     """
     A convenience function used to create the parameter dictionnary for hyperparameter tuning
 
@@ -160,6 +160,8 @@ def params_combiner(classifier: str="logistic") -> dict:
     ----------
     classifier : str, optional
         The classifier used in the pipeline, by default "logistic"
+    params_clf : dict, optional
+        The classifier's dict of params, by default None
 
     Returns
     -------
@@ -198,24 +200,42 @@ def params_combiner(classifier: str="logistic") -> dict:
 
     elif classifier == "random_forest":
         params_clf = dict(classifier__n_estimators=np.arange(50, 301, 10),
-                          classifier__max_depth=np.arange(1, 5),
+                          classifier__max_depth=np.arange(1, 10),
                           classifier__max_leaf_nodes=np.arange(20, 101),
                           classifier__min_samples_split =np.arange(2, 50),
                           classifier__min_samples_leaf=np.arange(1, 50),
                           classifier__max_features=["log2", "sqrt"],
                           )
-        
+
     elif classifier == "xgb":
         params_clf = dict(classifier__n_estimators=np.arange(10, 101, 5),
                           classifier__max_depth=np.arange(1, 5),
-                          classifier__grow_policy=[0, 1],
+                          #classifier__grow_policy=['depthwise', 'lossguide'],
                           classifier__learning_rate=stats.uniform(loc=0, scale=1),
                           classifier__booster =["gbtree", "gblinear", "dart"],
-                          classifier__max_bins=np.arange(50, 256),
                           classifier__reg_alpha=stats.uniform(loc=0, scale=1)
                           )
-    
-    return pipe_params.update(params_clf)
+
+    elif classifier == "stacked":
+        params_clf = dict(classifier__final_estimator__C=stats.uniform(loc=0, scale=5),
+                          classifier__final_estimator__penalty=["l1", "l2"],
+                          classifier__rf__n_estimators=np.arange(50, 301, 10),
+                          classifier__rf__max_depth=np.arange(1, 5),
+                          classifier__rf__max_leaf_nodes=np.arange(20, 101),
+                          classifier__rf__min_samples_split =np.arange(2, 50),
+                          classifier__rf__min_samples_leaf=np.arange(1, 50),
+                          classifier__rf__max_features=["log2", "sqrt"],
+                          classifier__gbt__learning_rate=stats.uniform(loc=0, scale=1),
+                          classifier__gbt__max_depth=np.arange(1, 5),
+                          classifier__gbt__max_leaf_nodes=np.arange(5, 60),
+                          classifier__gbt__l2_regularization=stats.uniform(loc=0, scale=1),
+                          classifier__gbt__max_bins=np.arange(50, 256)
+                        )
+
+    if params_clf is not None:
+        pipe_params.update(params_clf)
+
+    return pipe_params
 
 def params_extracter(model: object) -> dict:
     """

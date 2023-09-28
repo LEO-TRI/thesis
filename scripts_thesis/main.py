@@ -3,6 +3,7 @@ import pandas as pd
 from datetime import datetime
 import os
 import pickle
+import json
 
 from colorama import Fore, Style
 
@@ -88,12 +89,16 @@ class ModelFlow(LoadDataMixin, DataLoader):
         data_clean = preprocess_data(df)
         #data_clean = data_clean.sample(frac=0.1)
 
+        breakpoint()
+
         if has_model:
             data_clean = clean_target_feature(data_clean)
             data_clean = clean_variables_features(data_clean)
 
+        breakpoint()
+
         data_clean_pred = data_clean.sample(n=10, random_state=1830, replace=False)
-        data_clean_train = data_clean.drop(data_clean_pred.index)
+        data_clean_train = data_clean.drop(index=data_clean_pred.index)
 
         k = len(data_clean)
         now = datetime.now()
@@ -101,8 +106,7 @@ class ModelFlow(LoadDataMixin, DataLoader):
         file_name = f"processed_{k}_rows_{now.strftime('%d-%m-%Y-%H-%M')}.parquet.gzip"
         full_file_path = os.path.join(LOCAL_DATA_PATH, file_name)
 
-        data_clean_train.to_parquet(full_file_path,
-                    compression='gzip')
+        data_clean_train.to_parquet(full_file_path, compression='gzip')
 
         print("✅ preprocess() done \n Saved localy")
 
@@ -139,12 +143,12 @@ class ModelFlow(LoadDataMixin, DataLoader):
             return None
 
         if classifiers is None:
-            classifiers=["logistic", "gbt", "random_forest", "sgd", "xgb", "stacked"]
+            classifiers=["logistic", "gbt", "random_forest", "sgd", "gNB", "xgb", "stacked"]
 
         print(Fore.MAGENTA + f"\nTuning {len(classifiers)} model(s)..." + Style.RESET_ALL)
 
         tuned_results = {key: tune_model(X, y, n_iter=n_iter, classifier=key) for key in classifiers} #Test the pipeline with hyperparameters for three potential classifiers
-        tuned_results = {key: list(model.best_estimator_, params_extracter(model), model) for key, model in tuned_results.items()} #Extract the best results, and parameters from the fitted pipelines
+        tuned_results = {key: [model.best_params_, params_extracter(model), model] for key, model in tuned_results.items()} #Extract the best results, and parameters from the fitted pipelines
         tuned_results = {key: value for key, value in sorted(tuned_results.items(), key= lambda x : x[1][1].get("precision"), reverse=True)}
 
         print(Fore.MAGENTA + "Models' results are:" + Style.RESET_ALL)
@@ -152,7 +156,17 @@ class ModelFlow(LoadDataMixin, DataLoader):
             tuned_results.get(key)[1] = {key: np.round(value, 2) for key, value in tuned_results.get(key)[1].items()}
             print(f"{key} : {tuned_results.get(key)[1]}\n")
 
-        best_model_ind = list(tuned_results.keys())[0] #Select the index of the best model
+        best_model_ind = list(tuned_results.keys())[0] #Select the key of the best model
+
+        model_iteration = len(os.listdir(LOCAL_MODEL_PATH)) + 1
+        file_name = f'model_train_{best_model_ind}_V{model_iteration}'
+        full_file_path = os.path.join(LOCAL_MODEL_PATH, file_name)
+
+        print(tuned_results.get(best_model_ind)[0])
+        print(type(tuned_results.get(best_model_ind)[0]))
+
+        with open(full_file_path, 'wb') as f:
+            pickle.dump(tuned_results.get(best_model_ind)[0], f)
 
         return tuned_results.get(best_model_ind) #Return the best model
 
@@ -185,7 +199,9 @@ class ModelFlow(LoadDataMixin, DataLoader):
             return None
 
         print(Fore.MAGENTA + "\nTraining model..." + Style.RESET_ALL)
-        model, results, auc_metrics = train_model(X, y, test_split, classifier=classifier) #auc_metrics = (test_list, pred_list)
+
+        model, results, auc_metrics = train_model(X, y, test_split, classifier=classifier) #auc_metrics = (test_list, pred_list, proba_list)
+        tuple_fig =  auc_cross_val(auc_metrics) #Producing the cross_val metrics
 
         model_iteration = len(os.listdir(LOCAL_MODEL_PATH)) + 1
         file_name = f'model_V{model_iteration}.pkl'
@@ -196,11 +212,19 @@ class ModelFlow(LoadDataMixin, DataLoader):
         full_file_path = os.path.join(LOCAL_RESULT_PATH, file_name)
         results.to_csv(full_file_path)
 
-        file_name = f'auc_curve_{model_iteration}'
-        full_file_path = os.path.join(LOCAL_IMAGE_PATH, file_name)
-        fig =  auc_cross_val(auc_metrics)
-        fig.savefig(fname=full_file_path, format="png")
+        if tuple_fig[1] is None:
+            fig, _ = tuple_fig
+            file_name = f'auc_curve_{model_iteration}'
+            full_file_path = os.path.join(LOCAL_IMAGE_PATH, file_name)
+            fig.savefig(fname=full_file_path, format="png")
 
+        else:
+            fig_1, fig_2 = tuple_fig
+            file_name_1, file_name_2 = f'auc_curve_{model_iteration}_pred.jpeg', f'auc_curve_{model_iteration}_proba.jpeg'
+            full_file_path_1 = os.path.join(LOCAL_IMAGE_PATH, file_name_1)
+            full_file_path_2 = os.path.join(LOCAL_IMAGE_PATH, file_name_2)
+            fig_1.write_image(full_file_path_1)
+            fig_2.write_image(full_file_path_2)
 
     def evaluate(file_name: str = None, target: str = "license") -> pd.DataFrame:
         """
