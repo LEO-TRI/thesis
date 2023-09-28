@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import seaborn as sns
 
-from sklearn.metrics import accuracy_score, f1_score, confusion_matrix, precision_score, RocCurveDisplay, auc, roc_curve
+from sklearn.metrics import accuracy_score, f1_score, confusion_matrix, precision_score, auc, roc_curve, RocCurveDisplay
 
 from scripts_thesis.utils import *
 
@@ -170,7 +170,71 @@ def model_dl_examiner(train: np.ndarray, val: np.ndarray) -> go.Figure:
 
     fig.show()
 
-def _auc_curve(test_array: np.ndarray, target_array: np.ndarray, n_splits: int) -> go.Figure:
+
+
+class RocCurveDisplayPlotly():
+    """
+    A reconstruction of the sklearn.metrics.RocCurveDisplay class to output Plotly plots rather thant plt.plots.
+
+    Converts RocCurveDisplay inner plot method to plot_plotly 
+    """
+    def __init__(self, *, fpr, tpr, roc_auc=None, estimator_name=None, pos_label=None):
+        self.estimator_name = estimator_name
+        self.fpr = fpr
+        self.tpr = tpr
+        self.roc_auc = roc_auc
+        self.pos_label = pos_label
+
+    
+    def plot(
+        self,
+        ax=None,
+        *,
+        name=None,
+        plot_chance_level=False,
+        chance_level_kw=None,
+        **kwargs,
+    ):
+        pass
+
+
+    @classmethod
+    def from_predictions(
+        cls,
+        y_true,
+        y_pred,
+        *,
+        sample_weight=None,
+        drop_intermediate=True,
+        pos_label=None,
+        name=None,
+        plot_chance_level=False,
+        chance_level_kw=None,
+        **kwargs):
+
+        fpr, tpr, _ = roc_curve(
+            y_true,
+            y_pred,
+            pos_label=pos_label,
+            sample_weight=sample_weight,
+            drop_intermediate=drop_intermediate,
+        )
+        roc_auc = auc(fpr, tpr)
+
+        viz = RocCurveDisplayPlotly(
+            fpr=fpr,
+            tpr=tpr,
+            roc_auc=roc_auc,
+            estimator_name=name,
+            pos_label=pos_label,
+        )
+
+
+
+
+
+
+def _auc_curve(test_array: np.ndarray, target_array: np.ndarray, n_splits: int, drop_intermediate: bool = True) -> go.Figure:
     """
     A function used to calculate cross_validated auc.
 
@@ -188,7 +252,7 @@ def _auc_curve(test_array: np.ndarray, target_array: np.ndarray, n_splits: int) 
     Returns
     -------
     fig : go.Figure
-        The cross validated AUC curves
+        The cross validated AUC curves in 1 plotly figure 
     """
 
     tprs = []
@@ -199,7 +263,11 @@ def _auc_curve(test_array: np.ndarray, target_array: np.ndarray, n_splits: int) 
 
     for fold, (y_test, y_pred) in enumerate(zip(test_array, target_array)):
 
-        fpr, tpr, thresholds = roc_curve(y_test, y_pred, pos_label=1)
+        fpr, tpr, _ = roc_curve(y_test, 
+                                y_pred, 
+                                pos_label=1, 
+                                drop_intermediate=drop_intermediate
+                                )
         roc_auc = auc(fpr, tpr)
 
         fig.add_trace(go.Scatter(x=fpr,
