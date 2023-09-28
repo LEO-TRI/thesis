@@ -5,9 +5,11 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import seaborn as sns
 
-from sklearn.metrics import accuracy_score, f1_score, confusion_matrix, precision_score, auc, roc_curve, RocCurveDisplay
+from sklearn.metrics import accuracy_score, f1_score, confusion_matrix, precision_score, auc
 
 from scripts_thesis.utils import *
+from scripts_thesis.charter import *
+from scripts_thesis.roc_display import RocCurveDisplayPlotly
 
 import numpy as np
 import pandas as pd
@@ -117,6 +119,7 @@ def plot_confusion_matrix(y_true: np.ndarray, y_pred: np.ndarray, width: int= 60
     fig : go.Figure
         A confusion matrix of the model's result
     """
+
     labels = sorted(list(set(y_true)))
     df_lambda = pd.DataFrame(
         confusion_matrix(y_true, y_pred),
@@ -250,70 +253,7 @@ def model_dl_examiner(train: np.ndarray, val: np.ndarray) -> go.Figure:
     fig.show()
 
 
-
-class RocCurveDisplayPlotly():
-    """
-    A reconstruction of the sklearn.metrics.RocCurveDisplay class to output Plotly plots rather thant plt.plots.
-
-    Converts RocCurveDisplay inner plot method to plot_plotly 
-    """
-    def __init__(self, *, fpr, tpr, roc_auc=None, estimator_name=None, pos_label=None):
-        self.estimator_name = estimator_name
-        self.fpr = fpr
-        self.tpr = tpr
-        self.roc_auc = roc_auc
-        self.pos_label = pos_label
-
-    
-    def plot(
-        self,
-        ax=None,
-        *,
-        name=None,
-        plot_chance_level=False,
-        chance_level_kw=None,
-        **kwargs,
-    ):
-        pass
-
-
-    @classmethod
-    def from_predictions(
-        cls,
-        y_true,
-        y_pred,
-        *,
-        sample_weight=None,
-        drop_intermediate=True,
-        pos_label=None,
-        name=None,
-        plot_chance_level=False,
-        chance_level_kw=None,
-        **kwargs):
-
-        fpr, tpr, _ = roc_curve(
-            y_true,
-            y_pred,
-            pos_label=pos_label,
-            sample_weight=sample_weight,
-            drop_intermediate=drop_intermediate,
-        )
-        roc_auc = auc(fpr, tpr)
-
-        viz = RocCurveDisplayPlotly(
-            fpr=fpr,
-            tpr=tpr,
-            roc_auc=roc_auc,
-            estimator_name=name,
-            pos_label=pos_label,
-        )
-
-
-
-
-
-
-def _auc_curve(test_array: np.ndarray, target_array: np.ndarray, n_splits: int, drop_intermediate: bool = True) -> go.Figure:
+def _auc_curve(test_array: np.ndarray, target_array: np.ndarray, n_splits: int, **kwargs) -> go.Figure:
     """
     A function used to calculate cross_validated auc.
 
@@ -322,16 +262,17 @@ def _auc_curve(test_array: np.ndarray, target_array: np.ndarray, n_splits: int, 
     Parameters
     ----------
     test_array : np.ndarray
-        The array of test values
+        The array of test values, needs to be of dimensions (n, m) with n the number of folds and m the length of the test data
     target_array : np.ndarray
         The array of predicted values, can be binary or probabilities
+        Needs to be of dimensions (n, m) with n the number of folds and m the length of the test data
     n_splits : int
         Number of splits in the cross validation
 
     Returns
     -------
     fig : go.Figure
-        The cross validated AUC curves in 1 plotly figure 
+        The cross validated AUC curves in 1 plotly figure
     """
 
     tprs = []
@@ -339,28 +280,21 @@ def _auc_curve(test_array: np.ndarray, target_array: np.ndarray, n_splits: int, 
     mean_fpr = np.linspace(0, 1, 100)
 
     fig = go.Figure()
+    mask = len(test_array) - 1
 
     for fold, (y_test, y_pred) in enumerate(zip(test_array, target_array)):
 
-        fpr, tpr, _ = roc_curve(y_test, 
-                                y_pred, 
-                                pos_label=1, 
-                                drop_intermediate=drop_intermediate
-                                )
-        roc_auc = auc(fpr, tpr)
+        viz = RocCurveDisplayPlotly.from_predictions(y_test, y_pred,
+                                                     pos_label=1, fold=fold,
+                                                     n_splits=n_splits,
+                                                     plot_chance_level=(mask == fold),
+                                                     fig=fig,
+                                                     show_fig=False)
 
-        fig.add_trace(go.Scatter(x=fpr,
-                                 y=tpr,
-                                 opacity=0.3,
-                                 mode='lines',
-                                 name=f"ROC fold {1 + fold // n_splits} - {fold % n_splits + 1} - AUC = {roc_auc:0.2f}"
-                                 )
-                      )
-
-        interp_tpr = np.interp(mean_fpr, fpr, tpr) # Interpolates additional points for the curve
+        interp_tpr = np.interp(mean_fpr, viz.fpr, viz.tpr) # Interpolates additional points for the curve
         interp_tpr[0] = 0.0
         tprs.append(interp_tpr)
-        aucs.append(roc_auc)
+        aucs.append(viz.roc_auc)
 
     mean_tpr = np.mean(tprs, axis=0)
     mean_tpr[-1] = 1.0
@@ -368,20 +302,12 @@ def _auc_curve(test_array: np.ndarray, target_array: np.ndarray, n_splits: int, 
     #std_auc = np.std(aucs)
 
     fig.add_trace(go.Scatter(x=mean_fpr,
-                                 y=mean_tpr,
-                                 mode='lines',
-                                 line = dict(color=hex_colors[-1], width=2, dash='dot'),
-                                 name=f"Mean ROC (AUC = {np.round(mean_auc, 2)})"
-                                 )
-                  )
-
-    fig.add_trace(go.Scatter(x=[0, 1],
-                             y=[0, 1],
-                             mode='lines',
-                             name="Chance Level - AUC = 0.50",
-                             line = dict(color=hex_colors[0], width=2, dash='dash'),
-                             )
-                  )
+                                y=mean_tpr,
+                                mode='lines',
+                                line = dict(color=hex_colors[-1], width=2, dash='dot'),
+                                name=f"Mean ROC (AUC = {np.round(mean_auc, 2)})"
+                                )
+                )
 
     #Adding a confidence interval
     std_tpr = np.std(tprs, axis=0)
@@ -389,37 +315,40 @@ def _auc_curve(test_array: np.ndarray, target_array: np.ndarray, n_splits: int, 
     tprs_lower = np.maximum(mean_tpr - std_tpr, 0)
 
     fig.add_trace(go.Scatter(x=mean_fpr,
-                                 y=tprs_upper,
-                                 mode='lines',
-                                 line_color='grey',
-                                 name="Lower std bound",
-                                 showlegend=False
-                                 )
+                                y=tprs_upper,
+                                mode='lines',
+                                line_color='grey',
+                                name="Lower std bound",
+                                showlegend=False
+                                )
         )
     fig.add_trace(go.Scatter(x=mean_fpr,
-                                 y=tprs_lower,
-                                 mode='lines',
-                                 fill='tonexty',
-                                 line_color='grey',
-                                 name="CI interval"
-                                 )
+                                y=tprs_lower,
+                                mode='lines',
+                                fill='tonexty',
+                                line_color='grey',
+                                name="CI interval"
+                                )
         )
 
     fig.update_layout(
         xaxis=dict(range=[-0.05, 1.05], title="False Positive Rate"),
         yaxis=dict(range=[-0.05, 1.05], title="True Positive Rate"),
         title="ROC curves with variability\n (CV)",
-        legend=dict(yanchor="bottom",
+        legend=dict(title_text='ROC results',
+                    yanchor="bottom",
                     y=0.0,
-                    xanchor="right",
-                    x=0.99,
+                    xanchor="left",
+                    x= 1.05,
                     )
         )
 
-    fig.show()
+    width = kwargs.get("width", 950)
+    height = kwargs.get("height", 600)
+
+    fig = charter_plotly(fig, width=width, height=height)
 
     return fig
-
 
 def auc_cross_val(auc_metrics: tuple, n_splits: int= 5):
     """
