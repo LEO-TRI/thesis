@@ -101,7 +101,7 @@ def charter_plotly(fig, width=1000, height=600, title_place=0.3) -> go.Figure:
 
 def plot_confusion_matrix(y_true: np.ndarray, y_pred: np.ndarray, width: int= 600, height: int= 600) -> go.Figure:
     """
-    Convenience function to print a confusion matrix with the predicted results y_pred
+    Convenience function to print a confusion matrix with the predicted results y_pred and actual data y_true
 
     Parameters
     ----------
