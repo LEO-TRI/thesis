@@ -205,7 +205,7 @@ def build_pipeline(numeric_cols: list[str], text_cols: list[str], other_cols: li
     if classifier not in classifiers.keys():
         raise ValueError("Invalid classifier name. Choose 'logistic', 'gbt', 'random_forest', 'sgd', 'xgb' or 'stacked'.")
 
-    if (classifier == "gbt") | (classifier == 'stacked'): #Adding an additional step for classifiers that require dense array
+    if (classifier == "gbt") | (classifier == 'stacked') | (classifier == "gNB"): #Adding an additional step for classifiers that require dense array
         sparse_to_dense_transformer = FunctionTransformer(func=sparse_to_dense, validate=False)
         pipeline.steps.append(['dense', sparse_to_dense_transformer])
 
@@ -258,7 +258,7 @@ def tune_model(X: pd.DataFrame, y: pd.Series, max_features: int=1000, n_iter: in
                                      scoring=scoring,
                                      refit="precision",
                                      random_state=1830,
-                                     verbose=1)
+                                     verbose=2)
 
     rand_search.fit(X, y)
 
