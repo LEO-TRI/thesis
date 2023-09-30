@@ -199,7 +199,7 @@ def params_combiner(classifier: str="logistic", params_clf: dict= None) -> dict:
                           classifier__min_samples_leaf=np.arange(1, 50, dtype=int),
                           classifier__max_features=["log2", "sqrt"],
                           )
-    
+
     elif classifier == "sgd":
         params_clf = dict(classifier__penalty=["l1", "l2"],
                           classifier__alpha=stats.uniform(loc=0, scale=1),

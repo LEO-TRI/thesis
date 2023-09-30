@@ -177,7 +177,7 @@ def build_pipeline(numeric_cols: list[str], text_cols: list[str], other_cols: li
 
     # Create the final preprocessing pipeline
     pipeline = Pipeline([
-        ("balancing", RandomUnderSampler(random_state=1830)),
+        #("balancing", RandomUnderSampler(random_state=1830)),
         ('preprocessing', column_transformer)]
                         )
 
