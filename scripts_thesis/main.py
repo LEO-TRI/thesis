@@ -141,9 +141,13 @@ class ModelFlow(LoadDataMixin, DataLoader):
         X, y = self.prep_data(file_name=file_name, target=target)
         if X is None: #Used to exit the function and trigger an error if load_processed_data fails
             return None
+        
 
         if classifiers is None:
             classifiers=["logistic", "gbt", "random_forest", "sgd", "gNB", "xgb", "stacked"]
+
+        if type(classifiers)==str: #Converts to list format for iteration 
+            classifiers = [classifiers]
 
         print(Fore.MAGENTA + f"\nTuning {len(classifiers)} model(s)..." + Style.RESET_ALL)
 

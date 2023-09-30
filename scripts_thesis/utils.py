@@ -191,21 +191,21 @@ def params_combiner(classifier: str="logistic", params_clf: dict= None) -> dict:
                           classifier__max_bins=np.arange(50, 256)
                           )
 
+    elif classifier == "random_forest":
+        params_clf = dict(classifier__n_estimators=np.arange(50, 301, 10, dtype=int),
+                          classifier__max_depth=np.arange(1, 10, dtype=int),
+                          classifier__max_leaf_nodes=np.arange(20, 101, dtype=int),
+                          classifier__min_samples_split =np.arange(2, 50, dtype=int),
+                          classifier__min_samples_leaf=np.arange(1, 50, dtype=int),
+                          classifier__max_features=["log2", "sqrt"],
+                          )
+    
     elif classifier == "sgd":
         params_clf = dict(classifier__penalty=["l1", "l2"],
                           classifier__alpha=stats.uniform(loc=0, scale=1),
                           classifier__learning_rate=["constant", "optimal"],
                           classifier__loss=["hinge", "squared_hinge", "perceptron"]
         )
-
-    elif classifier == "random_forest":
-        params_clf = dict(classifier__n_estimators=np.arange(50, 301, 10),
-                          classifier__max_depth=np.arange(1, 10),
-                          classifier__max_leaf_nodes=np.arange(20, 101),
-                          classifier__min_samples_split =np.arange(2, 50),
-                          classifier__min_samples_leaf=np.arange(1, 50),
-                          classifier__max_features=["log2", "sqrt"],
-                          )
 
     elif classifier == "xgb":
         params_clf = dict(classifier__n_estimators=np.arange(10, 101, 5),

@@ -17,7 +17,9 @@ class SpacyClean:
     def __init__(self):
         #Creating 2 spacy models. 1 for French, 1 for English.
         #fast_lang comes here and is integrated in the English model. Will be used to differentiate between languages
+
         self.nlp_en = spacy.load(('en_core_web_sm'))
+
         self.nlp_en.add_pipe("language_detector")
         self.nlp_en.remove_pipe('ner')
 
@@ -34,7 +36,7 @@ class SpacyClean:
         Parameters
         ----------
         alpha : array_like
-            A text column of a pd.DataFrame. Each cell must be a string. I
+            A text column of a pd.DataFrame. Each cell must be a string. 
 
         Returns
         -------
