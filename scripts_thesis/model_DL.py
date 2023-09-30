@@ -6,9 +6,6 @@ from sklearn.model_selection import train_test_split
 import gensim.downloader as api
 word2vec_transfer = api.load("glove-wiki-gigaword-100")
 
-from scripts_thesis.data import DataLoader
-
-
 def embed_sentence_with_TF(word2vec: object, sentence: list[str]) -> list:
     """
     Function to embed words into vectors
@@ -51,9 +48,8 @@ def preprocess_dl_text(X: np.ndarray, max_len: int=200) -> tf.Tensor:
 
     return tf.convert_to_tensor(X_pad)
 
-#TODO
-X_train = preprocess_dl_text()
-X_test = preprocess_dl_text()
+#X_train = preprocess_dl_text()
+#X_test = preprocess_dl_text()
 
 #emb = Embedding(output_dim=embedding_size, input_dim=100, input_length=seq_length)(nlp_input)
 #nlp_out = Bidirectional(LSTM(128, dropout=0.3, recurrent_dropout=0.3, kernel_regularizer=regularizers.l2(0.01)))(nlp_input)
@@ -64,7 +60,7 @@ class NeuralModel:
         self.embedding_dims = embedding_dims
         self.num_tags = num_tags
 
-    def build_model(self) -> tf.keras.Model:
+    def build_model(self, X_train: tf.Tensor) -> tf.keras.Model:
         """
         Function to build a double input neural network model
 
@@ -82,29 +78,32 @@ class NeuralModel:
             ngrams = 2,
             max_tokens=self.embedding_dims,
             output_mode='int',
-            output_sequence_length=max_len
+            output_sequence_length=max_len,
+            pad_to_max_tokens=True
             )
         vectorize_layer.adapt(X_train)
 
         cat_input = tf.keras.Input(shape=(self.num_tags,), name="tags")
         num_input = tf.keras.Input(shape=(10,), name='num_input') #TODO
-        nlp_input = tf.keras.Input(shape=(None,), name='nlp_input')
+        nlp_input = tf.keras.Input(shape=(1, ), name='nlp_input')
+
+        #tf.keras.layers.CategoryEncoding(num_tokens=20, output_mode="one_hot")
 
         nlp_vec = vectorize_layer(nlp_input)
         nlp_features = tf.keras.layers.Embedding(self.embedding_dims+ 1, 64)(nlp_vec)
-        x = tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(128, activation="tanh", dropout=0.3, return_sequences=True))(nlp_features)
-        nlp_out = tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(128, activation="tanh", return_sequences=False))(x)
+        nlp_features = tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(128, activation="tanh",
+                                                               dropout=0.3, return_sequences=True))(nlp_features)
+        nlp_out = tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(128, activation="tanh", return_sequences=False))(nlp_features)
 
-        x = tf.keras.layers.Concatenate([nlp_out, num_input, cat_input])
+        x = tf.keras.layers.Concatenate(axis=1)([nlp_out, num_input, cat_input])
 
-        x = tf.keras.layers.Dense(130, activation="relu")(x)
-        x = tf.keras.layers.Dropout(0.30)(x)
         x = tf.keras.layers.Dense(80, activation="relu")(x)
         x = tf.keras.layers.Dropout(0.30)(x)
-        pred = tf.keras.layers.Dense(1, activation="sigmoid")(x)
+        x = tf.keras.layers.Dense(40, activation="relu")(x)
+        x = tf.keras.layers.Dropout(0.30)(x)
+        pred = tf.keras.layers.Dense(1)(x)
         model = tf.keras.Model(inputs=[nlp_input , num_input, cat_input], outputs=[pred])
 
-        print(tf.keras.utils.plot_model(model, show_shapes=True))
 
         return model
 
