@@ -85,15 +85,16 @@ class ModelFlow(LoadDataMixin, DataLoader):
 
         # Process data
         df = self.load_raw_data() #Brings back load_raw_data. Used as a test for mixin
+        reviews = self.load_raw_data(target="reviews")
 
         data_clean = preprocess_data(df)
         #data_clean = data_clean.sample(frac=0.1)
 
-        breakpoint()
+        print(Fore.MAGENTA + "\n prepocess Part 1 done"+ Style.RESET_ALL)
 
         if has_model:
             data_clean = clean_target_feature(data_clean)
-            data_clean = clean_variables_features(data_clean)
+            data_clean = clean_variables_features(data_clean, reviews)
 
         breakpoint()
 
@@ -141,12 +142,12 @@ class ModelFlow(LoadDataMixin, DataLoader):
         X, y = self.prep_data(file_name=file_name, target=target)
         if X is None: #Used to exit the function and trigger an error if load_processed_data fails
             return None
-        
+
 
         if classifiers is None:
             classifiers=["logistic", "gbt", "random_forest", "sgd", "gNB", "xgb", "stacked"]
 
-        if type(classifiers)==str: #Converts to list format for iteration 
+        if type(classifiers)==str: #Converts to list format for iteration
             classifiers = [classifiers]
 
         print(Fore.MAGENTA + f"\nTuning {len(classifiers)} model(s)..." + Style.RESET_ALL)
