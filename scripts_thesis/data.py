@@ -165,16 +165,19 @@ class DataLoader:
     A class centralising data loading methods
     """
 
-    def __init__(self, path: str = LOCAL_RAW_PATH):
+    def __init__(self, path: str = LOCAL_RAW_PATH, target :str="listing"):
         """
         Parameters
         ----------
         path : str, optional
             The path of the raw data file, by default LOCAL_RAW_PATH stored in params.py
+        target : str, optional
+            The type of data being seeked
         """
         self.path = path
+        self.target = target
 
-    def load_folder(self, path: str = None) -> [pd.DataFrame]:
+    def load_folder(self, path: str = None, target :str="listing") -> [pd.DataFrame]:
         """
         A function to faciliate iterations over all available csvs in a given folder
 
@@ -182,6 +185,8 @@ class DataLoader:
         ----------
         path : str, optional
             The path to the directory with the raw data, if None defaults to the LOCAL_RAW_DATA_PATH, by default None
+        target : str, optional
+            The type of data being seeked, by default listing
 
         Returns
         -------
@@ -200,7 +205,7 @@ class DataLoader:
         for f in files:
                 # get filename
                 stock = os.path.basename(f)
-                if len(re.findall("listing", stock))>0:
+                if len(re.findall(target, stock))>0:
                     temp_df = pd.read_csv(f)
                     # create new column with filename
                     temp_df['ticker'] = stock
@@ -208,11 +213,16 @@ class DataLoader:
                     temp_df['ticker'] = temp_df['ticker'].replace('listings_', '', regex=True)
                     yield temp_df
 
-    def load_raw_data(self) -> pd.DataFrame:
+    def load_raw_data(self, target :str="listing") -> pd.DataFrame:
         """
         A function to convert the list of dataframe yielded by load_folder()
 
         Leverages load_folder() and its yield structure to concatenate [pd.DataFrame] into 1 pd.DataFrame
+
+        Parameters
+        ----------
+        target : str, optional
+            The type of data being seeked, by default listing
 
         Returns
         -------
@@ -220,12 +230,11 @@ class DataLoader:
             The full pd.DataFrame of raw data
         """
         if len(os.listdir(self.path))>0:
-            li = [df for df in self.load_folder()]
+            li = [df for df in self.load_folder(target=target)]
 
         else:
             full_file_path = os.path.join(os.getcwd(), "data")
-            li = [df for df in self.load_folder(full_file_path)]
-
+            li = [df for df in self.load_folder(full_file_path, target)]
 
         return pd.concat(li)
 
@@ -296,14 +305,13 @@ class DataLoader:
 
         return X, y
 
-
 class LoadDataMixin():
     """
     A test class to check how mixins work
     Is supposed to allow the ModelFlow class in main.py to inherit a method from DataLoader
     """
-    def load_raw_data(self):
-        return super().load_raw_data()
+    def load_raw_data(self, target :str= "listing"):
+        return super().load_raw_data(target)
 
     def prep_data(self, file_name: str= None, target: str= "license"):
         return super().prep_data(file_name, target)

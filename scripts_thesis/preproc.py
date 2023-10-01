@@ -3,6 +3,7 @@ import numpy as np
 from thefuzz import fuzz
 from scripts_thesis.cleaning import CleanData, SpacyClean
 from tqdm import tqdm
+import string
 
 cd = CleanData()
 sc = SpacyClean()
@@ -75,7 +76,7 @@ def text_desc_selector(df:pd.DataFrame) -> pd.DataFrame:
 
     return unique_val_de
 
-def create_survival_rate(df:pd.DataFrame)-> pd.DataFrame:
+def create_occupancy_rate(df:pd.DataFrame)-> pd.DataFrame:
     df.loc[:, ["first_review", "last_review"]] = df[["first_review", "last_review"]].apply(pd.to_datetime, axis=0)
     df["time_difference"] = (df["last_review"] - df['first_review']) / np.timedelta64(1, 'D')
     df["nb_of_nights_cons"] = df["number_of_reviews"] / 0.5
@@ -153,13 +154,13 @@ def preprocess_data(df:pd.DataFrame) -> pd.DataFrame:
     df_merged = df_merged.merge(temp_df, on="group", how="left")
     df_merged["group"] = df_merged["group"].astype(int)
 
-    df_merged = create_survival_rate(df_merged)
+    df_merged = create_occupancy_rate(df_merged)
 
     return df_merged
 
 ###Additional preproc for model preparation###
 
-def clean_variables_features(df: pd.DataFrame, features: [str] = None, train_set:bool = True) -> pd.DataFrame:
+def clean_variables_features(df: pd.DataFrame, reviews: pd.DataFrame, features: [str] = None, train_set:bool = True) -> pd.DataFrame:
 
     if train_set:
         upper_bound = np.quantile(df["price"], 0.75) * 10
@@ -167,6 +168,10 @@ def clean_variables_features(df: pd.DataFrame, features: [str] = None, train_set
 
         mask = (df["price"]< upper_bound) & (5<df["price"]) & (df["number_of_reviews"]!=0) & (df["description"].map(lambda row : len(row)>1))
         df = df.loc[mask,:].reset_index(drop=True)
+
+    df = df.set_index("id")
+    reviews = reviews.set_index("listing_id")[["comments"]]
+    df = df.join(reviews, how="left")
 
     df["host_identity_verified"] = np.where(df["host_identity_verified"]=="t", 1, 0)
     df["host_is_superhost"] = np.where(df["host_is_superhost"]=="t", 1, 0)
@@ -176,20 +181,34 @@ def clean_variables_features(df: pd.DataFrame, features: [str] = None, train_set
 
     df["description"] = df["description"].fillna(" ")
 
+    df['word_count'] = [len(review.split()) for review in df['host_about']]
+    df['upper_char_count'] = [sum(char.isupper() for char in review) for review in df['host_about']]
+    df['special_char_count'] = [sum(char in string.punctuation for char in review) for review in df['host_about']]
+
     df["description"] = cd.clean_vec(df["description"].values)
     df["description"] = sc.preprocess_spacy(df["description"].values)
 
     df["host_about"] = df["host_about"].fillna(" ")
+
+    df['word_count'] = [len(review.split()) for review in df['host_about']]
+    df['upper_char_count'] = [sum(char.isupper() for char in review) for review in df['host_about']]
+    df['special_char_count'] = [sum(char in string.punctuation for char in review) for review in df['host_about']]
+
     df["has_host_about"] = np.where(df["host_about"].map(lambda row : len(row)>20), 1, 0)
     df["host_about"] = cd.clean_vec(df["host_about"].values)
     df["host_about"] = sc.preprocess_spacy(df["host_about"].values)
+
+    df["comments"] = cd.clean_vec(df["comments"].values)
+    df["comments"] = sc.preprocess_spacy(df["comments"].values)
 
     if features is None:
         features = ["host_is_superhost", "host_identity_verified",
             "accommodates", "beds", "price", "number_of_reviews",
             "review_scores_rating", "amenities", "license",
             "reviews_per_month", "neighbourhood_cleansed",
-            "host_listings_count", "description", "has_host_about", "host_about"]
+            "host_listings_count", "description", "has_host_about",
+            "host_about", "word_count", "upper_char_count", "special_char_count",
+            "time_difference", "occupancy_rate_cons", "comments"]
 
     df = df.loc[:, features]
 
