@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import tensorflow as tf
 
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
@@ -169,7 +170,7 @@ def params_combiner(classifier: str="logistic", params_clf: dict= None) -> dict:
         A full dictionnary of hyperparameters and potential values
     """
 
-    pipe_params = dict(preprocessing__text__selectkbest__k=np.arange(100, 2000 + 1, 100),
+    pipe_params = dict(preprocessing__text__selectkbest__k=np.arange(200, 2000 + 1, 100),
                        preprocessing__text__text_preprocessing__text1__ngram_range=[(1, 1), (1, 2), (1, 3)],
                        preprocessing__text__text_preprocessing__text2__ngram_range=[(1, 1), (1, 2), (1, 3)],
                        preprocessing__text__text_preprocessing__text3__ngram_range=[(1, 1), (1, 2), (1, 3)],
@@ -208,7 +209,7 @@ def params_combiner(classifier: str="logistic", params_clf: dict= None) -> dict:
         )
 
     elif classifier == "xgb":
-        params_clf = dict(classifier__n_estimators=np.arange(10, 101, 5),
+        params_clf = dict(classifier__n_estimators=np.arange(10, 51, 5),
                           classifier__max_depth=np.arange(1, 5),
                           #classifier__grow_policy=['depthwise', 'lossguide'],
                           classifier__learning_rate=stats.uniform(loc=0, scale=1),
@@ -274,3 +275,47 @@ def sparse_to_dense(X: sparse.csr_matrix) -> np.ndarray:
         return X.toarray()
     else:
         return X
+
+def neg_to_pos(X: np.ndarray):
+    """
+    Recenters values so that min = 0 for all numerical features.
+
+    Used for models that require non-negative inputs
+
+    Parameters
+    ----------
+    X : np.ndarray
+        An array of numerical features
+
+    Returns
+    -------
+    X + mins
+        An array of numerical features so that the vector np.min(X, axis=0) only returns values>=0
+    """
+
+    mins = np.min(X, axis=0) * -1
+    return X + mins
+
+def ohe(x: pd.Series) -> np.ndarray:
+    """
+    Custom one hot encoder to convert strings into integers.
+
+    Each unique value in the column is converted into an integer and mapped to all equal values in the series.
+
+    Parameters
+    ----------
+    x : pd.Series
+        The column on which to do the transformation with dimension (k, 1)
+
+    Returns
+    -------
+    x_transformed : np.ndarray
+        The transformed column. Still has a dimension (k, 1)
+    """
+    x_ohe = np.zeros(len(x))
+    x = np.array(x)
+
+    for ind, val in enumerate(np.unique(x)):
+        x_ohe[(x == val)] = ind
+
+    return x_ohe.astype(int)

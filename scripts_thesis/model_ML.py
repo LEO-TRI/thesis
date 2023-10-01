@@ -1,21 +1,25 @@
 ########################### ML TEMPLATE ##############################
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.experimental import enable_iterative_imputer
+from sklearn.experimental import enable_iterative_imputer #Required to import IterativeImputer
 from sklearn.impute import IterativeImputer
+from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.model_selection import train_test_split, RepeatedStratifiedKFold, RandomizedSearchCV
 from sklearn.metrics import accuracy_score, precision_score, f1_score, recall_score, classification_report, make_scorer
+from sklearn.decomposition import PCA, TruncatedSVD
+from sklearn.feature_selection import SelectKBest, chi2
+
+from sklearn.preprocessing import RobustScaler, OneHotEncoder, FunctionTransformer, MinMaxScaler
+from sklearn.pipeline import FeatureUnion, Pipeline
+from sklearn.compose import ColumnTransformer
 
 from sklearn.naive_bayes import GaussianNB
 from sklearn.ensemble import HistGradientBoostingClassifier , RandomForestClassifier, StackingClassifier
 from sklearn.linear_model import LogisticRegression, SGDClassifier
-from sklearn.feature_selection import SelectKBest, chi2
-from sklearn.preprocessing import RobustScaler, OneHotEncoder, FunctionTransformer
-from sklearn.pipeline import FeatureUnion
-from sklearn.compose import ColumnTransformer
 
-from imblearn.pipeline import Pipeline
-from imblearn.over_sampling import SMOTE
-from imblearn.under_sampling import RandomUnderSampler
+import sklearn
+
+#from imblearn.pipeline import Pipeline
+#from imblearn.over_sampling import SMOTE
+#from imblearn.under_sampling import RandomUnderSampler
 
 import xgboost as xgb
 
@@ -25,7 +29,7 @@ import time
 import os
 import pickle
 
-from scripts_thesis.utils import params_combiner, sparse_to_dense
+from scripts_thesis.utils import params_combiner, sparse_to_dense, neg_to_pos
 from scripts_thesis.params import *
 
 from colorama import Fore, Style
@@ -45,13 +49,14 @@ def print_results(y_test: np.ndarray, y_pred: np.ndarray, verbose: bool= True, f
     verbose: bool
         Whether to print the results, by default True
     fold: int
-        The fold on which the data was train, by default None
+        The fold on which the data was train if cross-validated, by default None
 
     Returns
     -------
     dict
         Dictionnary of evaluation metrics
     """
+
     metrics = [np.round(accuracy_score(y_test, y_pred), 2),
                np.round(precision_score(y_test, y_pred, zero_division= 0), 2),
                np.round(recall_score(y_test, y_pred, zero_division= 0), 2),
@@ -61,6 +66,7 @@ def print_results(y_test: np.ndarray, y_pred: np.ndarray, verbose: bool= True, f
     metrics_name = ["accuracy", "precision", "recall", "f1"]
     metrics = dict(zip(metrics_name, metrics))
 
+#Add a fold parameter to know from which fold data comes from if cv
     if fold is not None:
         metrics['fold'] = fold + 1
 
@@ -141,6 +147,11 @@ def build_pipeline(numeric_cols: list[str], text_cols: list[str], other_cols: li
         ('scaler', RobustScaler())
     ])
 
+#Added since xgb requires all non-negative inputs
+    if classifier == "xgb":
+        neg_to_pos_transformer = FunctionTransformer(func=neg_to_pos, validate=False)
+        numeric_transformer.steps.append(["neg_to_pos", neg_to_pos_transformer])
+
     num_transformer = ColumnTransformer(
         transformers=[
             ('num', numeric_transformer, numeric_cols),
@@ -175,15 +186,14 @@ def build_pipeline(numeric_cols: list[str], text_cols: list[str], other_cols: li
                                        ("cat", cat_transformer)
                                        ])
 
-    # Create the final preprocessing pipeline
+    # Create the final preprocessing pipeline. Further steps can be added with append later
     pipeline = Pipeline([
         #("balancing", RandomUnderSampler(random_state=1830)),
+        #('smote', SMOTE(random_state=42, k_neighbors=20)),
         ('preprocessing', column_transformer)]
                         )
 
-    #('smote', SMOTE(random_state=42, k_neighbors=20)),
-
-    #Add the "head" of the pipeline from the potential classifiers
+    #Set the "head" of the pipeline from the potential classifiers
     classifiers = dict(logistic= LogisticRegression(penalty='l2', C=0.9, random_state=1830, solver='liblinear', max_iter=1000, class_weight="balanced"),
                        gbt= HistGradientBoostingClassifier(random_state=1830),
                        random_forest= RandomForestClassifier(random_state=1830, class_weight="balanced"),
@@ -198,22 +208,30 @@ def build_pipeline(numeric_cols: list[str], text_cols: list[str], other_cols: li
                       ("gNB", classifiers.get("gNB"))
                       ]
 
+    #Adding the stacked classifier to the dict of classifiers
         clf = StackingClassifier(estimators=estimators, final_estimator=classifiers.get("logistic"))
-        classifiers[classifier] = clf #Adding the stacked classifier to the dict of classifiers
+        classifiers[classifier] = clf
 
     classifier_model = classifiers.get(classifier, None)
     if classifier not in classifiers.keys():
         raise ValueError("Invalid classifier name. Choose 'logistic', 'gbt', 'random_forest', 'sgd', 'xgb' or 'stacked'.")
 
-    if (classifier == "gbt") | (classifier == 'stacked') | (classifier == "gNB"): #Adding an additional step for classifiers that require dense array
+    #Adding an additional step for classifiers that require dense array
+    if (classifier == "gbt") | (classifier == 'stacked') | (classifier == "gNB") | (classifier == "xgb"):
         sparse_to_dense_transformer = FunctionTransformer(func=sparse_to_dense, validate=False)
         pipeline.steps.append(['dense', sparse_to_dense_transformer])
 
-    pipeline.steps.append(['classifier', classifier_model]) #Adding a classifier head
+    #Reducing dimensionality for the xgb model
+        if (classifier == "xgb"):
+            pipeline.steps.append(['dimensionality_reducer', SelectKBest(chi2, k=200)])
+
+    #Adding a classifier head to the pipeline
+    pipeline.steps.append(['classifier', classifier_model])
 
     return pipeline
 
-def tune_model(X: pd.DataFrame, y: pd.Series, max_features: int=1000, n_iter: int=20, cv: int=5, classifier: str='logistic') -> Pipeline:
+def tune_model(X: pd.DataFrame, y: pd.Series,
+               max_features: int=1000, n_iter: int=20, cv: int=5, classifier: str='logistic') -> Pipeline:
     """
     Tune a machine learning model with hyperparameter optimization.
 
@@ -267,7 +285,7 @@ def tune_model(X: pd.DataFrame, y: pd.Series, max_features: int=1000, n_iter: in
     return rand_search
 
 
-def train_model(X: pd.DataFrame, y: pd.Series, test_split: float=0.3, max_features: int=1000, n_splits: int = 5, classifier: str='logistic') -> Pipeline:
+def train_model(X: pd.DataFrame, y: pd.Series, test_split: float=0.3, max_features: int=1000, n_splits: int= 5, classifier: str='logistic') -> Pipeline:
     """
     Fit the passed model with the passed data and return a fitted model, a DataFrame of metrics and a tuple (y_test, y_pred) or (y_test, y_pred, y_proba)
 
@@ -285,7 +303,6 @@ def train_model(X: pd.DataFrame, y: pd.Series, test_split: float=0.3, max_featur
         The number of folds for the cross-val
     classifier : str, optional
         The classifier to use in the pipeline ('logistic', 'gbt', or 'random_forest', 'sgd' or 'stacked'), by default 'logistic'.
-
 
     Returns
     -------
@@ -312,15 +329,16 @@ def train_model(X: pd.DataFrame, y: pd.Series, test_split: float=0.3, max_featur
     test_list = []
     proba_list = []
 
+    #Filters for models that cannot produce probabilities estimates
     has_proba = True
-    if "classifier__loss" in pipe_model.get_params().keys(): #Filters for models that cannot produce probabilities estimates
+    if (classifier == "sgd") | (classifier == "xgb"):
         has_proba = False
 
     for fold, (train, test) in enumerate(cv.split(X, y)):
         start_time = time.time()  # Record the start time
+
         pipe_model.fit(X.loc[train,:], y[train])
         y_pred = pipe_model.predict(X.loc[test,:])
-
         res.append(print_results(y[test], y_pred, verbose=False, fold=fold))
 
         pred_list.append(y_pred)
@@ -387,11 +405,11 @@ def evaluate_model(model, X: pd.DataFrame, y: pd.Series, test_split:float=0.3) -
 
     metrics = [accuracy_score(y_test, y_pred) , precision_score(y_test, y_pred, average="macro"),
                f1_score(y_test, y_pred, average="macro"), recall_score(y_test, y_pred, average="macro")]
+
     metrics_name = ["res_accuracy", "res_precision", "res_f1", "res_recall"]
 
     print(f"✅ Model evaluated")
     print_results(y_test, y_pred)
-
 
     print(f"✅ Model evaluated, accuracy: {np.round(metrics[0], 2)}, precision: {np.round(metrics[1], 2)}, recall: {np.round(metrics[2], 2)}")
 
@@ -400,28 +418,34 @@ def evaluate_model(model, X: pd.DataFrame, y: pd.Series, test_split:float=0.3) -
 
     results = dict(zip(metrics_name, metrics))
     results = {key: [value] for key, value in results.items()}
+
     return pd.DataFrame(results, index=[0]), y_pred, y_test
 
 
-def predict_model(model, X: pd.DataFrame) -> np.ndarray:
-    """Function to predict using a trained model
+def predict_model(model: Pipeline, X: pd.DataFrame) -> np.ndarray:
+    """
+    Function to predict using a trained model
 
     Parameters
     ----------
-    model : object
-        A trained sklearn model
+    model : Pipeline
+        A trained sklearn Pipeline
     X : pd.DataFrame
-        Data passed in the model to obtained predictions
+        Data passed in the model to obtained predictions.
+        Must have been cleaned and preprocess beforehand
 
     Returns
     -------
     np.ndarray
-        An array of 0 and 1, depending on predictions
+        An array of predictions. Can be binary or probabilities depending on model
     """
+
+    if type(model.steps[-1][-1]) in ["sklearn.linear_model._stochastic_gradient.SGDClassifier", "xgboost.sklearn.XGBClassifier"]:
+        return model.predict(X)
+
     return model.predict(X), model.predict_proba(X)
 
-
-def load_model(model_name: str = None) -> None:
+def load_model(model_name: str= None) -> Pipeline:
     """
     Convenience function to load a pickled model
 
@@ -432,7 +456,7 @@ def load_model(model_name: str = None) -> None:
 
     Returns
     -------
-    model : object
+    model : Pipeline
         The loaded sklearn model
     """
     if model_name==None:
