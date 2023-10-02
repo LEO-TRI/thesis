@@ -176,7 +176,7 @@ class ModelFlow(LoadDataMixin, DataLoader):
         return tuned_results.get(best_model_ind) #Return the best model
 
 
-    def train(self, file_name: str = None, target: str = "license", test_split: float = 0.3, classifier: str="logistic") -> None:
+    def train(self, file_name: str = None, target: str = "license", test_split: float = 0.3, classifiers: str="logistic") -> None:
         """
         Load data from the data folder.
 
@@ -205,8 +205,8 @@ class ModelFlow(LoadDataMixin, DataLoader):
 
         print(Fore.MAGENTA + "\nTraining model..." + Style.RESET_ALL)
 
-        model, results, auc_metrics = train_model(X, y, test_split, classifier=classifier) #auc_metrics = (test_list, pred_list, proba_list)
-        tuple_fig =  auc_cross_val(auc_metrics) #Producing the cross_val metrics
+        model, results, auc_metrics = train_model(X, y, test_split, classifier=classifiers) #auc_metrics = (test_list, pred_list, proba_list)
+        tuple_fig = auc_cross_val(auc_metrics) #Producing the cross_val metrics
 
         model_iteration = len(os.listdir(LOCAL_MODEL_PATH)) + 1
         file_name = f'model_V{model_iteration}.pkl'
@@ -260,6 +260,7 @@ class ModelFlow(LoadDataMixin, DataLoader):
         X = data_processed.drop(columns=[target])
 
         model = load_model()
+
 
         results, y_pred, y_test = evaluate_model(model, X, y)
 

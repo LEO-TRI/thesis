@@ -268,6 +268,7 @@ def _auc_curve(test_array: np.ndarray, target_array: np.ndarray, n_splits: int, 
     height = kwargs.get("height", 600)
 
     fig = charter_plotly(fig, width=width, height=height)
+    fig.show()
 
     return fig
 
