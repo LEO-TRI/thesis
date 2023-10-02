@@ -61,7 +61,7 @@ def print_results(y_test: np.ndarray, y_pred: np.ndarray, verbose: bool= True, f
                np.round(precision_score(y_test, y_pred, zero_division= 0), 2),
                np.round(recall_score(y_test, y_pred, zero_division= 0), 2),
                np.round(f1_score(y_test, y_pred, zero_division= 0), 2),
-               np.round(roc_auc_score(y_test, y_pred, zero_division= 0), 2),
+               np.round(roc_auc_score(y_test, y_pred, average="weighted"), 2),
                ]
 
     metrics_name = ["accuracy", "precision", "recall", "f1"]

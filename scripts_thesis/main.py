@@ -206,7 +206,7 @@ class ModelFlow(LoadDataMixin, DataLoader):
         print(Fore.MAGENTA + "\nTraining model..." + Style.RESET_ALL)
 
         model, results, auc_metrics = train_model(X, y, test_split, classifier=classifiers) #auc_metrics = (test_list, pred_list, proba_list)
-        tuple_fig = auc_cross_val(auc_metrics) #Producing the cross_val metrics
+        fig = auc_cross_val(auc_metrics) #Producing the cross_val metrics
 
         model_iteration = len(os.listdir(LOCAL_MODEL_PATH)) + 1
         file_name = f'model_V{model_iteration}.pkl'
@@ -217,19 +217,10 @@ class ModelFlow(LoadDataMixin, DataLoader):
         full_file_path = os.path.join(LOCAL_RESULT_PATH, file_name)
         results.to_csv(full_file_path)
 
-        if tuple_fig[1] is None:
-            fig, _ = tuple_fig
-            file_name = f'auc_curve_{model_iteration}'
-            full_file_path = os.path.join(LOCAL_IMAGE_PATH, file_name)
-            fig.savefig(fname=full_file_path, format="png")
+        file_name = f'auc_curve_{model_iteration}'
+        full_file_path = os.path.join(LOCAL_IMAGE_PATH, file_name)
+        fig.write_image(fname=full_file_path, format="png")
 
-        else:
-            fig_1, fig_2 = tuple_fig
-            file_name_1, file_name_2 = f'auc_curve_{model_iteration}_pred.jpeg', f'auc_curve_{model_iteration}_proba.jpeg'
-            full_file_path_1 = os.path.join(LOCAL_IMAGE_PATH, file_name_1)
-            full_file_path_2 = os.path.join(LOCAL_IMAGE_PATH, file_name_2)
-            fig_1.write_image(full_file_path_1)
-            fig_2.write_image(full_file_path_2)
 
     def evaluate(file_name: str = None, target: str = "license") -> pd.DataFrame:
         """

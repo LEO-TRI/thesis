@@ -291,9 +291,9 @@ def auc_cross_val(auc_metrics: tuple, n_splits: int= 5):
 
     if len(auc_metrics) == 2:
         test_array, pred_array = auc_metrics
-        return (_auc_curve(test_array, pred_array, n_splits=n_splits), None) #A half empty tuple
+        return _auc_curve(test_array, pred_array, n_splits=n_splits)#A half empty tuple
 
     elif len(auc_metrics) == 3:
         test_array, pred_array, proba_array = auc_metrics
         proba_array = [arr[:, 1] for arr in proba_array]
-        return (_auc_curve(test_array, proba_array, n_splits=n_splits), _auc_curve(test_array, pred_array, n_splits=n_splits))
+        return _auc_curve(test_array, proba_array, n_splits=n_splits)
