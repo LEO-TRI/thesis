@@ -57,15 +57,12 @@ def print_results(y_test: np.ndarray, y_pred: np.ndarray, verbose: bool= True, f
         Dictionnary of evaluation metrics
     """
 
-    metrics = [np.round(accuracy_score(y_test, y_pred), 2),
-               np.round(precision_score(y_test, y_pred, zero_division= 0), 2),
-               np.round(recall_score(y_test, y_pred, zero_division= 0), 2),
-               np.round(f1_score(y_test, y_pred, zero_division= 0), 2),
-               np.round(roc_auc_score(y_test, y_pred, average="weighted"), 2),
-               ]
-
-    metrics_name = ["accuracy", "precision", "recall", "f1"]
-    metrics = dict(zip(metrics_name, metrics))
+    metrics = dict(accuracy=np.round(accuracy_score(y_test, y_pred), 2),
+                   precision=np.round(precision_score(y_test, y_pred, zero_division= 0), 2),
+                   recall=np.round(recall_score(y_test, y_pred, zero_division= 0), 2),
+                   f1=np.round(f1_score(y_test, y_pred, zero_division= 0), 2),
+                   roc_auc=np.round(roc_auc_score(y_test, y_pred, average="weighted"), 2)
+                   )
 
 #Add a fold parameter to know from which fold data comes from if cv
     if fold is not None:
