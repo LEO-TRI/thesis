@@ -319,3 +319,20 @@ def ohe(x: pd.Series) -> np.ndarray:
         x_ohe[(x == val)] = ind
 
     return x_ohe.astype(int)
+
+def is_array_like(obj) -> bool:
+    """
+    Checks whether an object is array_like, i.e. is one of (np.ndarray, pd.Series, list)
+
+    Parameters
+    ----------
+    obj : Any
+        Any python object
+
+    Returns
+    -------
+    bool
+        A boolean, True if the object is array_like, False else
+    """
+
+    return (type(obj) == np.ndarray) | (type(obj) == list) | (type(obj) == pd.Series)

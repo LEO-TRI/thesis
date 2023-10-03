@@ -28,10 +28,10 @@ def plot_confusion_matrix(y_true: np.ndarray, y_pred: np.ndarray, width: int= 60
 
     Parameters
     ----------
-    y_true : np.array
-        Array of real data
-    y_pred : np.array
-        Array of predicted data
+    y_true : np.ndarray
+        Array of real data. Can be 1-D (one set of data) or 2-D (cross-validated data)
+    y_pred : np.ndarray
+        Array of predicted data. Can be 1-D (one set of predictions) or 2-D (cross-validated predictions)
     width : int, optional
         dimension of the image, by default 400
     height : int, optional
@@ -43,6 +43,13 @@ def plot_confusion_matrix(y_true: np.ndarray, y_pred: np.ndarray, width: int= 60
         A confusion matrix of the model's result
     """
 
+    if y_true.shape != y_pred.shape:
+        raise ValueError("y_true and y_pred must have the same shape")
+
+    if is_array_like(y_true[0]):
+        y_true = np.ravel(y_true)
+        y_pred = np.ravel(y_pred)
+
     labels = sorted(list(set(y_true)))
     df_lambda = pd.DataFrame(
         confusion_matrix(y_true, y_pred),
@@ -50,12 +57,13 @@ def plot_confusion_matrix(y_true: np.ndarray, y_pred: np.ndarray, width: int= 60
         columns = labels
     )
 
-    df_lambda = df_lambda/len(y_true) #Get results as proportion of total results
+    #Get results as proportion of total results
+    df_lambda = df_lambda/len(y_true)
     df_lambda = df_lambda.apply(lambda value : np.round(value, 2))
 
     acc = accuracy_score(y_true, y_pred)
-    f1s = f1_score(y_true, y_pred, average = 'weighted')
-    precision = precision_score(y_true, y_pred, average = 'weighted')
+    f1s = f1_score(y_true, y_pred)
+    precision = precision_score(y_true, y_pred)
 
     fig = go.Figure()
 
@@ -71,8 +79,8 @@ def plot_confusion_matrix(y_true: np.ndarray, y_pred: np.ndarray, width: int= 60
                    hoverongaps = False)
                    )
 
-    fig.update_layout(
-        title=f'Confusion Matrix : Overall results <br><sup>Accuracy: {acc:.2f}, F1: {f1s:.2f}, Precision: {precision:.2f}</sup>', #<br> is a line break, and <sup> is superscript
+    fig.update_layout(#<br> is a line break, and <sup> is superscript
+        title=f'Confusion Matrix : Overall results <br><sup>Accuracy: {acc:.2f}, F1: {f1s:.2f}, Precision: {precision:.2f}</sup>',
         xaxis=dict(title='Predicted'),
         yaxis=dict(title='Actual'),
         width=width,
