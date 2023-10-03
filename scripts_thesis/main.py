@@ -208,6 +208,8 @@ class ModelFlow(LoadDataMixin, DataLoader):
         model, results, auc_metrics = train_model(X, y, test_split, classifier=classifiers) #auc_metrics = (test_list, pred_list, proba_list)
         fig = auc_cross_val(auc_metrics) #Producing the cross_val metrics
 
+        print(Fore.MAGENTA + "\n ✅ Training finished, saving model and graph..." + Style.RESET_ALL)
+
         model_iteration = len(os.listdir(LOCAL_MODEL_PATH)) + 1
         file_name = f'model_V{model_iteration}.pkl'
         full_file_path = os.path.join(LOCAL_MODEL_PATH, file_name)
@@ -219,7 +221,7 @@ class ModelFlow(LoadDataMixin, DataLoader):
 
         file_name = f'auc_curve_{model_iteration}'
         full_file_path = os.path.join(LOCAL_IMAGE_PATH, file_name)
-        fig.write_image(fname=full_file_path, format="png")
+        fig.write_image(file =full_file_path, format="png")
 
 
     def evaluate(file_name: str = None, target: str = "license") -> pd.DataFrame:

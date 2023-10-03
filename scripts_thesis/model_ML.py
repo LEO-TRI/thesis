@@ -212,7 +212,7 @@ def build_pipeline(numeric_cols: list[str], text_cols: list[str], other_cols: li
 
     classifier_model = classifiers.get(classifier, None)
     if classifier not in classifiers.keys():
-        raise ValueError("Invalid classifier name. Choose 'logistic', 'gbt', 'random_forest', 'sgd', 'xgb' or 'stacked'.")
+        raise ValueError("Invalid classifier name. Choose 'logistic', 'gbt', 'random_forest', 'sgd', 'gNB', 'xgb' or 'stacked'.")
 
     #Adding an additional step for classifiers that require dense array
     if (classifier == "gbt") | (classifier == 'stacked') | (classifier == "gNB") | (classifier == "xgb"):
@@ -320,6 +320,11 @@ def train_model(X: pd.DataFrame, y: pd.Series, test_split: float=0.3, max_featur
 
     #Loads back the stored hyperparameters in params.py
     pipe_params = hyperparams_dict.get(classifier)
+
+    if pipe_params is None: 
+        print(Fore.BLUE + "\nNo hyperparameters detected, switching to default" + Style.RESET_ALL)
+
+    print(Fore.BLUE + f"\Setting hyperparams for {classifier}" + Style.RESET_ALL)
     pipe_model.set_params(**pipe_params)
 
     print(Fore.BLUE + "\nLaunching CV" + Style.RESET_ALL)
@@ -329,26 +334,27 @@ def train_model(X: pd.DataFrame, y: pd.Series, test_split: float=0.3, max_featur
     res = []
     pred_list = []
     test_list = []
-    proba_list = []
 
     #Filters for models that cannot produce probabilities estimates
     has_proba = True
-    if (classifier == "sgd") | (classifier == "xgb"):
+    if (classifier == "sgd"):# | (classifier == "xgb"):
         has_proba = False
 
     for fold, (train, test) in enumerate(cv.split(X, y)):
         start_time = time.time()  # Record the start time
 
-        pipe_model.fit(X.loc[train,:], y[train])
-        y_pred = pipe_model.predict(X.loc[test,:])
+        pipe_model.fit(X.iloc[train,:], y[train])
+        y_pred = pipe_model.predict(X.iloc[test,:])
         res.append(print_results(y[test], y_pred, verbose=False, fold=fold))
 
-        pred_list.append(y_pred)
         test_list.append(y[test])
 
         if has_proba:
             y_proba = pipe_model.predict_proba(X.loc[test,:])
-            proba_list.append(y_proba)
+            pred_list.append(y_proba[:,1])
+        else :
+            pred_list.append(y_pred)
+
 
         end_time = time.time()  # Record the end time
         elapsed_time = end_time - start_time  # Calculate elapsed time
@@ -361,14 +367,11 @@ def train_model(X: pd.DataFrame, y: pd.Series, test_split: float=0.3, max_featur
     pipe_model.fit(X_train, y_train)
 
     #size_data = y_train.value_counts().sort_values(ascending=False).iloc[0] * 16
-    print(f"✅ Model trained on \n {len(X_train)} original rows")
+    print(Fore.BLUE + f"✅ Model trained on \n {len(X_train)} original rows" + Style.RESET_ALL)
     print(f"Mean cross_validated accuracy: {round(np.mean(res['accuracy']), 2)}")
     print(f"Mean cross_validated precision: {round(np.mean(res['precision']), 2)}")
 
-    if has_proba:
-        return pipe_model, res, (pred_list, test_list, proba_list)
-
-    return pipe_model, res, (pred_list, test_list)
+    return pipe_model, res, (test_list, pred_list)
 
 def evaluate_model(model, X: pd.DataFrame, y: pd.Series, test_split:float=0.3) -> pd.DataFrame:
     """

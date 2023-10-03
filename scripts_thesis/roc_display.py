@@ -152,7 +152,7 @@ class RocCurveDisplayPlotly():
                         **kwargs)
 
 
-class PrecisionRecallDisplay():
+class PrecisionRecallDisplayPlotly():
     """Precision Recall visualization.
 
     Parameters
@@ -211,7 +211,6 @@ class PrecisionRecallDisplay():
         self.prevalence_pos_label = prevalence_pos_label
 
 
-
     def plot(
         self,
         ax=None,
@@ -256,28 +255,33 @@ class PrecisionRecallDisplay():
         display : :class:`~sklearn.metrics.PrecisionRecallDisplay`
             Object that stores computed values.
         """
-        self.ax_, self.figure_, name = self._validate_plot_params(ax=ax, name=name)
+        
+        if fig is None:
+            fig = go.Figure()
 
-        line_kwargs = {"drawstyle": "steps-post"}
-        if self.average_precision is not None and name is not None:
-            line_kwargs["label"] = f"{name} (AP = {self.average_precision:0.2f})"
-        elif self.average_precision is not None:
-            line_kwargs["label"] = f"AP = {self.average_precision:0.2f}"
-        elif name is not None:
-            line_kwargs["label"] = name
-        line_kwargs.update(**kwargs)
+        fold = kwargs.get('fold', None)
+        n_splits = kwargs.get('n_splits', None)
 
-        (self.line_,) = self.ax_.plot(self.recall, self.precision, **line_kwargs)
+        name=f"ROC curve - AUC = {self.average_precision:0.2f}"
+
+        if (type(fold)==int) & (type(n_splits)==int):
+            name = f"Fold {1 + fold // n_splits} - {fold % n_splits + 1} - (AP = {self.average_precision:0.2f})"
+
+        fig.add_trace(go.Scatter(x=self.recall, 
+                                 y=self.precision,
+                                 opacity=0.3,
+                                 mode='lines',
+                                 name=name,
+                                 showlegend=True
+                                )
+                    )
 
         info_pos_label = (
             f" (Positive label: {self.pos_label})" if self.pos_label is not None else ""
         )
 
-        xlabel = "Recall" + info_pos_label
-        ylabel = "Precision" + info_pos_label
-        self.ax_.set(xlabel=xlabel, ylabel=ylabel)
-
         if plot_chance_level:
+            
             if self.prevalence_pos_label is None:
                 raise ValueError(
                     "You must provide prevalence_pos_label when constructing the "
@@ -288,27 +292,36 @@ class PrecisionRecallDisplay():
                     "to automatically set prevalence_pos_label"
                 )
 
-            chance_level_line_kw = {
-                "label": f"Chance level (AP = {self.prevalence_pos_label:0.2f})",
-                "color": "k",
-                "linestyle": "--",
-            }
+            chance_level_line_kw = dict(width=2, dash='dash')
+
             if chance_level_kw is not None:
-                chance_level_line_kw.update(chance_level_kw)
+                chance_level_line_kw.update(**chance_level_kw)
 
-            (self.chance_level_,) = self.ax_.plot(
-                (0, 1),
-                (self.prevalence_pos_label, self.prevalence_pos_label),
-                **chance_level_line_kw,
-            )
-        else:
-            self.chance_level_ = None
+            fig.add_trace(go.Scatter(x=[0, 1],
+                                     y=[self.prevalence_pos_label, self.prevalence_pos_label],
+                                     mode='lines',
+                                     name="Chance Level - AUC = 0.50",
+                                     line = chance_level_line_kw
+                            )
+                )
 
-        if "label" in line_kwargs or plot_chance_level:
-            self.ax_.legend(loc="lower left")
+
+        fig.update_layout(
+                xaxis=dict(range=[-0.05, 1.05], title=xlabel),
+                yaxis=dict(range=[-0.05, 1.05], title=ylabel),
+                title="ROC curve",
+                legend=dict(yanchor="bottom",
+                            y=0.0,
+                            xanchor="right",
+                            x=0.99,
+                            )
+                )
+
+
+        if kwargs.get("show_fig", True):
+            fig.show()
 
         return self
-
 
     @classmethod
     def from_predictions(
@@ -368,9 +381,12 @@ class PrecisionRecallDisplay():
         -------
         display : :class:`~sklearn.metrics.PrecisionRecallDisplay`
         """
-        pos_label, name = cls._validate_from_predictions_params(
-            y_true, y_pred, sample_weight=sample_weight, pos_label=pos_label, name=name
-        )
+
+        return viz.plot(fig=fig,
+                        name=name,
+                        plot_chance_level=plot_chance_level,
+                        chance_level_kw=chance_level_kw,
+                        **kwargs)
 
         precision, recall, _ = precision_recall_curve(
             y_true,
@@ -386,7 +402,7 @@ class PrecisionRecallDisplay():
         class_count = Counter(y_true)
         prevalence_pos_label = class_count[pos_label] / sum(class_count.values())
 
-        viz = PrecisionRecallDisplay(
+        viz = PrecisionRecallDisplayPlotly(
             precision=precision,
             recall=recall,
             average_precision=average_precision,
