@@ -50,7 +50,11 @@ def plot_confusion_matrix(test_array: np.ndarray, target_array: np.ndarray, widt
         test_array = np.ravel(test_array)
         target_array = np.ravel(target_array)
 
+    if set(target_array) != set([0, 1]):
+        target_array = np.where(target_array>=0.5, 1, 0)
+
     labels = sorted(list(set(test_array)))
+
     df_lambda = pd.DataFrame(
         confusion_matrix(test_array, target_array),
         index = labels,
