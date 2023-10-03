@@ -9,10 +9,12 @@ from sklearn.metrics import accuracy_score, f1_score, confusion_matrix, precisio
 
 from scripts_thesis.utils import *
 from scripts_thesis.charter import *
-from scripts_thesis.roc_display import RocCurveDisplayPlotly
+from scripts_thesis.ml_display import RocCurveDisplayPlotly, PrecisionRecallDisplayPlotly
 
 import numpy as np
 import pandas as pd
+
+from colorama import Fore, Style
 
 custom_params = {"axes.spines.right": False, "axes.spines.top": False, "figure.figsize":(8, 8)}
 sns.set_theme(context='notebook', style='darkgrid', palette='deep', rc= custom_params)
@@ -205,8 +207,10 @@ def _auc_curve(test_array: np.ndarray, target_array: np.ndarray, n_splits: int, 
 
     for fold, (y_test, y_pred) in enumerate(zip(test_array, target_array)):
 
-        viz = RocCurveDisplayPlotly.from_predictions(y_test, y_pred,
-                                                     pos_label=1, fold=fold,
+        viz = RocCurveDisplayPlotly.from_predictions(y_test, 
+                                                     y_pred,
+                                                     pos_label=1, 
+                                                     fold=fold,
                                                      n_splits=n_splits,
                                                      plot_chance_level=(mask == fold),
                                                      fig=fig,
@@ -226,7 +230,7 @@ def _auc_curve(test_array: np.ndarray, target_array: np.ndarray, n_splits: int, 
                                 y=mean_tpr,
                                 mode='lines',
                                 line = dict(color=hex_colors[-1], width=2, dash='dot'),
-                                name=f"Mean ROC (AUC = {np.round(mean_auc, 2)})"
+                                name=f"Mean ROC (AUC = {np.round(mean_auc, 3)})"
                                 )
                 )
 
@@ -291,6 +295,7 @@ def auc_cross_val(auc_metrics: tuple, n_splits: int= 5):
 
     if len(auc_metrics) == 2:
         test_array, pred_array = auc_metrics
+        print(Fore.BLUE + "Producing graph" + Style.RESET_ALL)
         return _auc_curve(test_array, pred_array, n_splits=n_splits)#A half empty tuple
 
     elif len(auc_metrics) == 3:
