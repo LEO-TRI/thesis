@@ -10,7 +10,7 @@ from colorama import Fore, Style
 from scripts_thesis.data import DataLoader, LoadDataMixin
 from scripts_thesis.model_ML import train_model, evaluate_model, predict_model, load_model, tune_model
 from scripts_thesis.utils import get_top_features, params_extracter
-from scripts_thesis.graphs import model_explainer, plot_confusion_matrix, auc_cross_val
+from scripts_thesis.graphs import model_explainer, plot_confusion_matrix, graphs_cross_val
 
 from scripts_thesis.params import *
 from scripts_thesis.preproc import *
@@ -176,7 +176,7 @@ class ModelFlow(LoadDataMixin, DataLoader):
         return tuned_results.get(best_model_ind) #Return the best model
 
 
-    def train(self, file_name: str = None, target: str = "license", test_split: float = 0.3, classifiers: str="logistic") -> None:
+    def train(self, file_name: str = None, target: str = "license", test_split: float = 0.3, n_splits: int=5, classifiers: str="logistic") -> None:
         """
         Load data from the data folder.
 
@@ -205,8 +205,8 @@ class ModelFlow(LoadDataMixin, DataLoader):
 
         print(Fore.MAGENTA + "\nTraining model..." + Style.RESET_ALL)
 
-        model, results, auc_metrics = train_model(X, y, test_split, classifier=classifiers) #auc_metrics = (test_list, pred_list, proba_list)
-        fig = auc_cross_val(auc_metrics) #Producing the cross_val metrics
+        model, results, auc_metrics = train_model(X, y, test_split, classifier=classifiers, n_splits=n_splits) #auc_metrics = {test_list, proba_list}
+        fig1, fig2 = graphs_cross_val(auc_metrics) #Producing the cross_val metrics
 
         print(Fore.MAGENTA + "\n ✅ Training finished, saving model and graph..." + Style.RESET_ALL)
 
@@ -219,9 +219,13 @@ class ModelFlow(LoadDataMixin, DataLoader):
         full_file_path = os.path.join(LOCAL_RESULT_PATH, file_name)
         results.to_csv(full_file_path)
 
-        file_name = f'auc_curve_{model_iteration}'
-        full_file_path = os.path.join(LOCAL_IMAGE_PATH, file_name)
-        fig.write_image(file =full_file_path, format="png")
+        filename1 = f'auc_curve_{model_iteration}_{classifiers}'
+        full_file_path = os.path.join(LOCAL_IMAGE_PATH, filename1)
+        fig1.write_image(file =full_file_path, format="png")
+
+        filename2 = f'prc_curve_{model_iteration}_{classifiers}'
+        full_file_path = os.path.join(LOCAL_IMAGE_PATH, filename2)
+        fig2.write_image(file =full_file_path, format="png")
 
 
     def evaluate(file_name: str = None, target: str = "license") -> pd.DataFrame:
