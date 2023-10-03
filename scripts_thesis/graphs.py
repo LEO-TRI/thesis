@@ -22,15 +22,15 @@ sns.set_theme(context='notebook', style='darkgrid', palette='deep', rc= custom_p
 hex_colors = [mcolors.to_hex(color) for color in sns.diverging_palette(145, 300, s=60, n=5)]
 hex_colors.reverse()
 
-def plot_confusion_matrix(y_true: np.ndarray, y_pred: np.ndarray, width: int= 600, height: int= 600) -> go.Figure:
+def plot_confusion_matrix(test_array: np.ndarray, target_array: np.ndarray, width: int= 600, height: int= 600) -> go.Figure:
     """
     Convenience function to print a confusion matrix with the predicted results y_pred and actual data y_true
 
     Parameters
     ----------
-    y_true : np.ndarray
+    test_array : np.ndarray
         Array of real data. Can be 1-D (one set of data) or 2-D (cross-validated data)
-    y_pred : np.ndarray
+    target_array : np.ndarray
         Array of predicted data. Can be 1-D (one set of predictions) or 2-D (cross-validated predictions)
     width : int, optional
         dimension of the image, by default 400
@@ -43,27 +43,27 @@ def plot_confusion_matrix(y_true: np.ndarray, y_pred: np.ndarray, width: int= 60
         A confusion matrix of the model's result
     """
 
-    if y_true.shape != y_pred.shape:
-        raise ValueError("y_true and y_pred must have the same shape")
+    if test_array.shape != target_array.shape:
+        raise ValueError("test_array and target_array must have the same shape")
 
-    if is_array_like(y_true[0]):
-        y_true = np.ravel(y_true)
-        y_pred = np.ravel(y_pred)
+    if is_array_like(test_array[0]):
+        test_array = np.ravel(test_array)
+        target_array = np.ravel(target_array)
 
-    labels = sorted(list(set(y_true)))
+    labels = sorted(list(set(test_array)))
     df_lambda = pd.DataFrame(
-        confusion_matrix(y_true, y_pred),
+        confusion_matrix(test_array, target_array),
         index = labels,
         columns = labels
     )
 
     #Get results as proportion of total results
-    df_lambda = df_lambda/len(y_true)
+    df_lambda = df_lambda/len(test_array)
     df_lambda = df_lambda.apply(lambda value : np.round(value, 2))
 
-    acc = accuracy_score(y_true, y_pred)
-    f1s = f1_score(y_true, y_pred)
-    precision = precision_score(y_true, y_pred)
+    acc = accuracy_score(test_array, target_array)
+    f1s = f1_score(test_array, target_array)
+    precision = precision_score(test_array, target_array)
 
     fig = go.Figure()
 
@@ -366,5 +366,7 @@ def graphs_cross_val(auc_metrics: dict, n_splits: int= 5):
     sample = np.random.choice(sample_length, int(sample_length/2), replace=False)
 
     auc_metrics = {k : np.array(v)[sample] for k, v in auc_metrics.items()}
+
+    plot_confusion_matrix(**auc_metrics)
 
     return (_auc_curve(**auc_metrics, n_splits=n_splits), _prc_curve(**auc_metrics, n_splits=n_splits))
