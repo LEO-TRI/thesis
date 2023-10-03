@@ -3,7 +3,7 @@ from sklearn.experimental import enable_iterative_imputer #Required to import It
 from sklearn.impute import IterativeImputer
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.model_selection import train_test_split, RepeatedStratifiedKFold, RandomizedSearchCV
-from sklearn.metrics import accuracy_score, precision_score, f1_score, recall_score, classification_report, make_scorer
+from sklearn.metrics import accuracy_score, precision_score, f1_score, recall_score, classification_report, make_scorer, roc_auc_score
 from sklearn.decomposition import PCA, TruncatedSVD
 from sklearn.feature_selection import SelectKBest, chi2
 
@@ -57,14 +57,12 @@ def print_results(y_test: np.ndarray, y_pred: np.ndarray, verbose: bool= True, f
         Dictionnary of evaluation metrics
     """
 
-    metrics = [np.round(accuracy_score(y_test, y_pred), 2),
-               np.round(precision_score(y_test, y_pred, zero_division= 0), 2),
-               np.round(recall_score(y_test, y_pred, zero_division= 0), 2),
-               np.round(f1_score(y_test, y_pred, zero_division= 0), 2)
-               ]
-
-    metrics_name = ["accuracy", "precision", "recall", "f1"]
-    metrics = dict(zip(metrics_name, metrics))
+    metrics = dict(accuracy=np.round(accuracy_score(y_test, y_pred), 2),
+                   precision=np.round(precision_score(y_test, y_pred, zero_division= 0), 2),
+                   recall=np.round(recall_score(y_test, y_pred, zero_division= 0), 2),
+                   f1=np.round(f1_score(y_test, y_pred, zero_division= 0), 2),
+                   roc_auc=np.round(roc_auc_score(y_test, y_pred, average="weighted"), 2)
+                   )
 
 #Add a fold parameter to know from which fold data comes from if cv
     if fold is not None:
@@ -319,6 +317,10 @@ def train_model(X: pd.DataFrame, y: pd.Series, test_split: float=0.3, max_featur
     other_cols = list(set(X.columns) - set(numeric_cols) - set(text_cols))
 
     pipe_model = build_pipeline(numeric_cols, text_cols, other_cols, max_features_tfidf = max_features, classifier=classifier)
+
+    #Loads back the stored hyperparameters in params.py
+    pipe_params = hyperparams_dict.get(classifier)
+    pipe_model.set_params(**pipe_params)
 
     print(Fore.BLUE + "\nLaunching CV" + Style.RESET_ALL)
 
