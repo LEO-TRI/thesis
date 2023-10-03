@@ -321,10 +321,10 @@ def train_model(X: pd.DataFrame, y: pd.Series, test_split: float=0.3, max_featur
     #Loads back the stored hyperparameters in params.py
     pipe_params = hyperparams_dict.get(classifier)
 
-    if pipe_params is None: 
+    if pipe_params is None:
         print(Fore.BLUE + "\nNo hyperparameters detected, switching to default" + Style.RESET_ALL)
 
-    print(Fore.BLUE + f"\Setting hyperparams for {classifier}" + Style.RESET_ALL)
+    print(Fore.BLUE + f"\nSetting hyperparams for {classifier}" + Style.RESET_ALL)
     pipe_model.set_params(**pipe_params)
 
     print(Fore.BLUE + "\nLaunching CV" + Style.RESET_ALL)
@@ -371,7 +371,7 @@ def train_model(X: pd.DataFrame, y: pd.Series, test_split: float=0.3, max_featur
     print(f"Mean cross_validated accuracy: {round(np.mean(res['accuracy']), 2)}")
     print(f"Mean cross_validated precision: {round(np.mean(res['precision']), 2)}")
 
-    return pipe_model, res, (test_list, pred_list)
+    return pipe_model, res, dict(test_array=test_list, target_array=pred_list)
 
 def evaluate_model(model, X: pd.DataFrame, y: pd.Series, test_split:float=0.3) -> pd.DataFrame:
     """

@@ -1,304 +1,403 @@
-import plotly.express as px
 import plotly.graph_objects as go
-
-import matplotlib.pyplot as plt
-import matplotlib.colors as mcolors
-import seaborn as sns
-
-from sklearn.metrics import accuracy_score, f1_score, confusion_matrix, precision_score, auc
-
-from scripts_thesis.utils import *
-from scripts_thesis.charter import *
-from scripts_thesis.ml_display import RocCurveDisplayPlotly, PrecisionRecallDisplayPlotly
-
+from sklearn.metrics import auc, precision_recall_curve, average_precision_score
+import sklearn
 import numpy as np
-import pandas as pd
+from collections import Counter
 
-from colorama import Fore, Style
-
-custom_params = {"axes.spines.right": False, "axes.spines.top": False, "figure.figsize":(8, 8)}
-sns.set_theme(context='notebook', style='darkgrid', palette='deep', rc= custom_params)
-
-hex_colors = [mcolors.to_hex(color) for color in sns.diverging_palette(145, 300, s=60, n=5)]
-hex_colors.reverse()
-
-def plot_confusion_matrix(y_true: np.ndarray, y_pred: np.ndarray, width: int= 600, height: int= 600) -> go.Figure:
+class RocCurveDisplayPlotly():
     """
-    Convenience function to print a confusion matrix with the predicted results y_pred and actual data y_true
+    A reconstruction of the sklearn.metrics.RocCurveDisplay class to output Plotly plots rather thant plt.plots.
 
-    Parameters
-    ----------
-    y_true : np.array
-        Array of real data
-    y_pred : np.array
-        Array of predicted data
-    width : int, optional
-        dimension of the image, by default 400
-    height : int, optional
-        dimension of the image, by default 400
+    Converts RocCurveDisplay inner .plot() method to work with plotly instead.
 
-    Returns
-    -------
-    fig : go.Figure
-        A confusion matrix of the model's result
+    Small modifications to the class constructor .from_predictions() as well
     """
+    def __init__(self, *, fpr, tpr, roc_auc=None, estimator_name=None, pos_label=None):
+        self.estimator_name = estimator_name
+        self.fpr = fpr
+        self.tpr = tpr
+        self.roc_auc = roc_auc
+        self.pos_label = pos_label
 
-    labels = sorted(list(set(y_true)))
-    df_lambda = pd.DataFrame(
-        confusion_matrix(y_true, y_pred),
-        index = labels,
-        columns = labels
-    )
+    def plot(self, fig: go.Figure=None, plot_chance_level: bool=False, chance_level_kw: dict=None, **kwargs):
+        """
+        The class method used to plot the ROC curve with plotly
 
-    df_lambda = df_lambda/len(y_true) #Get results as proportion of total results
-    df_lambda = df_lambda.apply(lambda value : np.round(value, 2))
+        Parameters
+        ----------
+        fig : go.Figure, optional
+            A plotly go.Figure, by default None
+        plot_chance_level : bool, optional
+            Whether to plot the chance level, by default False
+        chance_level_kw : dict, optional
+            Additional parameters for the chance level curve, by default None
+            Only valid if plot_chance_level=True
 
-    acc = accuracy_score(y_true, y_pred)
-    f1s = f1_score(y_true, y_pred, average = 'weighted')
-    precision = precision_score(y_true, y_pred, average = 'weighted')
+        Returns
+        -------
+        self
+            Returns the class RocCurveDisplayPlotly
+        """
 
-    fig = go.Figure()
+        if fig is None:
+            fig = go.Figure()
 
-    fig.add_trace(go.Heatmap(
-                   z=df_lambda.values,
-                   x=[str(col) for col in df_lambda.columns],
-                   y=[str(col) for col in df_lambda.columns],
-                   colorscale='RdBu_r',
-                   text=df_lambda.values,
-                   texttemplate="%{text}%",
-                   textfont={"size":16},
-                   colorbar=dict(title='Proportion'),
-                   hoverongaps = False)
-                   )
+        fold = kwargs.get('fold', None)
+        n_splits = kwargs.get('n_splits', None)
 
-    fig.update_layout(
-        title=f'Confusion Matrix : Overall results <br><sup>Accuracy: {acc:.2f}, F1: {f1s:.2f}, Precision: {precision:.2f}</sup>', #<br> is a line break, and <sup> is superscript
-        xaxis=dict(title='Predicted'),
-        yaxis=dict(title='Actual'),
-        width=width,
-        height=height,
-        title_font=dict(
-            family='Arial',
-            color='black',
-            size=20
-        ),
-        font=dict(family='Arial', color='black')
-        )
+        name=f"ROC curve - AUC = {self.roc_auc:0.2f}"
+        if (type(fold)==int) & (type(n_splits)==int):
+            name = f"ROC fold {1 + fold // n_splits} - {fold % n_splits + 1} - AUC = {self.roc_auc:0.2f}"
 
-    return fig
-
-
-def model_explainer(df: pd.DataFrame, x: str= "coef", y: str= "feature")-> go.Figure:
-    """
-    A function that takes the dataframe outputed by get_top_features() and creates a barplot of most important features using Plotly
-
-    Parameters
-    ----------
-    df : pd.DataFrame
-        a dataframe with a categorical column (feature) and a numerical column (coef)
-    x : str, optional
-        column for the x-axis of the graph, by default "coef"
-    y : str, optional
-        column for the y-axis of the graph, by default "feature"
-
-    Returns
-    -------
-    fig : go.Figure
-        A plotly bar graph showing the most important coeficients and their values
-    """
-
-    colors = px.colors.qualitative.Dark24[:20]
-    template = 'CLF: %{customdata}<br>Feature: %{y}<br>Coefficient: %{x:.2f}'
-
-    fig = px.bar(
-        data_frame = df,
-        x = x,
-        y = y,
-        facet_col_wrap = 3,
-        facet_col_spacing = .15,
-        height = 1200,
-        labels = {
-            'coef': 'Coefficient',
-            'feature': ''
-        },
-        title = f'Top {len(df)} Strongest Predictors by SDG'
-    )
-
-    fig.for_each_trace(lambda x: x.update(hovertemplate = template))
-    fig.for_each_trace(lambda x: x.update(marker_color = colors.pop(0)))
-    fig.update_yaxes(matches = None, showticklabels = True)
-    fig.show()
-
-    return fig
-
-
-def model_dl_examiner(train: np.ndarray, val: np.ndarray) -> go.Figure:
-    """
-    A convenience function to produce the train and val loss for a trained TF model
-
-    Parameters
-    ----------
-    train : np.ndarray
-        The history of train losses from a trained model
-    val : np.ndarray
-        The history of val losses from a trained model
-
-    Returns
-    -------
-    fig : go.Figure
-        A plotly line chart
-    """
-
-    assert len(train) == len(val)
-
-    x = np.arange(len(train))
-
-    fig = go.Figure()
-
-    for color, name, line in zip([hex_colors[0], hex_colors[-1]], ["Train results", "Val results"], [train, val]):
-        fig.add_trace(
-            go.Scatter(x=x, y=line, mode='lines', name=name, marker_color = color)
-            )
-
-    fig.update_layout(
-        xaxis=dict(title='Epochs'),
-        yaxis=dict(title='Loss: Binary cross-entropy'),
-        title="Train and val losses across epochs",
-        legend=dict(
-        orientation="v",
-        yanchor="bottom",
-        y=0.8,
-        xanchor="right",
-        bgcolor="LightSteelBlue",
-        x=0.98)
-        )
-
-    fig.show()
-
-
-def _auc_curve(test_array: np.ndarray, target_array: np.ndarray, n_splits: int, **kwargs) -> go.Figure:
-    """
-    A function used to calculate cross_validated auc.
-
-    Used as part of auc_cross_val
-
-    Parameters
-    ----------
-    test_array : np.ndarray
-        The array of test values, needs to be of dimensions (n, m) with n the number of folds and m the length of the test data
-    target_array : np.ndarray
-        The array of predicted values, can be binary or probabilities
-        Needs to be of dimensions (n, m) with n the number of folds and m the length of the test data
-    n_splits : int
-        Number of splits in the cross validation
-
-    Returns
-    -------
-    fig : go.Figure
-        The cross validated AUC curves in 1 plotly figure
-    """
-
-    tprs = []
-    aucs = []
-    mean_fpr = np.linspace(0, 1, 100)
-
-    fig = go.Figure()
-    mask = len(test_array) - 1
-
-    for fold, (y_test, y_pred) in enumerate(zip(test_array, target_array)):
-
-        viz = RocCurveDisplayPlotly.from_predictions(y_test, 
-                                                     y_pred,
-                                                     pos_label=1, 
-                                                     fold=fold,
-                                                     n_splits=n_splits,
-                                                     plot_chance_level=(mask == fold),
-                                                     fig=fig,
-                                                     show_fig=False)
-
-        interp_tpr = np.interp(mean_fpr, viz.fpr, viz.tpr) # Interpolates additional points for the curve
-        interp_tpr[0] = 0.0
-        tprs.append(interp_tpr)
-        aucs.append(viz.roc_auc)
-
-    mean_tpr = np.mean(tprs, axis=0)
-    mean_tpr[-1] = 1.0
-    mean_auc = auc(mean_fpr, mean_tpr)
-    #std_auc = np.std(aucs)
-
-    fig.add_trace(go.Scatter(x=mean_fpr,
-                                y=mean_tpr,
-                                mode='lines',
-                                line = dict(color=hex_colors[-1], width=2, dash='dot'),
-                                name=f"Mean ROC (AUC = {np.round(mean_auc, 3)})"
+        fig.add_trace(go.Scatter(x=self.fpr,
+                                 y=self.tpr,
+                                 opacity=0.3,
+                                 mode='lines',
+                                 name=name,
+                                 showlegend=True
                                 )
+                    )
+
+        if plot_chance_level:
+            chance_level_line_kw = dict(width=2, dash='dash')
+            if chance_level_kw is not None:
+                chance_level_line_kw.update(**chance_level_kw)
+
+            fig.add_trace(go.Scatter(x=[0, 1],
+                                     y=[0, 1],
+                                     mode='lines',
+                                     name="Chance Level - AUC = 0.50",
+                                     line = chance_level_line_kw
+                            )
                 )
 
-    #Adding a confidence interval
-    std_tpr = np.std(tprs, axis=0)
-    tprs_upper = np.minimum(mean_tpr + std_tpr, 1)
-    tprs_lower = np.maximum(mean_tpr - std_tpr, 0)
+        fig.update_layout(
+                xaxis=dict(range=[-0.05, 1.05], title="False Positive Rate"),
+                yaxis=dict(range=[-0.05, 1.05], title="True Positive Rate"),
+                title="ROC curve",
+                legend=dict(yanchor="bottom",
+                            y=0.0,
+                            xanchor="right",
+                            x=0.99,
+                            )
+                )
 
-    fig.add_trace(go.Scatter(x=mean_fpr,
-                                y=tprs_upper,
-                                mode='lines',
-                                line_color='grey',
-                                name="Lower std bound",
-                                showlegend=False
-                                )
+
+        if kwargs.get("show_fig", True):
+            fig.show()
+        #self.fig = fig
+
+        return self
+
+    @classmethod
+    def from_predictions(
+        cls,
+        y_true: np.ndarray,
+        y_pred: np.ndarray,
+        drop_intermediate: bool=True,
+        pos_label: int=None,
+        name: str=None,
+        fig: go.Figure=None,
+        plot_chance_level: bool=False,
+        chance_level_kw: dict=None,
+        **kwargs):
+        """
+        A class constructor based on one array of actual value and one array of predictions (binary or probabilities)
+
+        Parameters
+        ----------
+        y_true : np.ndarray
+            The array of test values, needs to be of dimensions (n, m) with n the number of folds and m the length of the test data
+        y_pred : np.ndarray
+            The array of predicted values, can be binary or probabilities
+        drop_intermediate : bool, optional
+            Whether to smooth the ROC curve, by default True
+        pos_label : int, optional
+            The positive class label in the binary classification, by default None
+        name : str, optional
+            The name of the graph, by default None
+        fig : go.Figure, optional
+            A plotly figure, by default None
+        plot_chance_level : bool, optional
+            Whether to plot the chance level, by default False
+        chance_level_kw : dict, optional
+            Additional arguments for the chance_level curve, by default None
+
+        Returns
+        -------
+        self
+            The class instance via its .plot() method
+        """
+
+        fpr, tpr, _ = sklearn.metrics.roc_curve(
+            y_true,
+            y_pred,
+            pos_label=pos_label,
+            drop_intermediate=drop_intermediate,
         )
-    fig.add_trace(go.Scatter(x=mean_fpr,
-                                y=tprs_lower,
-                                mode='lines',
-                                fill='tonexty',
-                                line_color='grey',
-                                name="CI interval"
-                                )
+        roc_auc = auc(fpr, tpr)
+
+        viz = RocCurveDisplayPlotly(
+            fpr=fpr,
+            tpr=tpr,
+            roc_auc=roc_auc,
+            estimator_name=name,
+            pos_label=pos_label,
         )
 
-    fig.update_layout(
-        xaxis=dict(range=[-0.05, 1.05], title="False Positive Rate"),
-        yaxis=dict(range=[-0.05, 1.05], title="True Positive Rate"),
-        title="ROC curves with variability\n (CV)",
-        legend=dict(title_text='ROC results',
-                    yanchor="bottom",
-                    y=0.0,
-                    xanchor="left",
-                    x= 1.05,
-                    )
-        )
+        return viz.plot(fig=fig,
+                        name=name,
+                        plot_chance_level=plot_chance_level,
+                        chance_level_kw=chance_level_kw,
+                        **kwargs)
 
-    width = kwargs.get("width", 950)
-    height = kwargs.get("height", 600)
 
-    fig = charter_plotly(fig, width=width, height=height)
-    fig.show()
-
-    return fig
-
-def auc_cross_val(auc_metrics: tuple, n_splits: int= 5):
+class PrecisionRecallDisplayPlotly():
     """
-    A function to produce a figure with several ROC curves when cross-validating a model
+    Precision Recall visualization.
 
     Parameters
     ----------
-    auc_metrics : tuple
-        A tuple containing lists of lists for respectively y_test, y_pred and y_pred proba by cv fold
-    n_splits : int, optional
-        Number of folds by cv, by default 5
+    precision : ndarray
+        Precision values.
 
-    Returns
-    -------
-    tuple
-        A tuple containing one or two plotly graphs depending on the type of classifiers used
+    recall : ndarray
+        Recall values.
+
+    average_precision : float, default=None
+        Average precision. If None, the average precision is not shown.
+
+    estimator_name : str, default=None
+        Name of estimator. If None, then the estimator name is not shown.
+
+    pos_label : int, float, bool or str, default=None
+        The class considered as the positive class. If None, the class will not
+        be shown in the legend.
+
+    prevalence_pos_label : float, default=None
+        The prevalence of the positive label. It is used for plotting the
+        chance level line. If None, the chance level line will not be plotted
+        even if `plot_chance_level` is set to True when plotting.
+
+    Attributes
+    ----------
+    fig : Plotly's Figure
+        Precision recall curve.
     """
 
-    if len(auc_metrics) == 2:
-        test_array, pred_array = auc_metrics
-        print(Fore.BLUE + "Producing graph" + Style.RESET_ALL)
-        return _auc_curve(test_array, pred_array, n_splits=n_splits)#A half empty tuple
+    def __init__(
+        self,
+        precision,
+        recall,
+        *,
+        average_precision=None,
+        estimator_name=None,
+        pos_label=None,
+        prevalence_pos_label=None,
+    ):
+        self.estimator_name = estimator_name
+        self.precision = precision
+        self.recall = recall
+        self.average_precision = average_precision
+        self.pos_label = pos_label
+        self.prevalence_pos_label = prevalence_pos_label
 
-    elif len(auc_metrics) == 3:
-        test_array, pred_array, proba_array = auc_metrics
-        proba_array = [arr[:, 1] for arr in proba_array]
-        return _auc_curve(test_array, proba_array, n_splits=n_splits)
+
+    def plot(
+        self,
+        fig=None,
+        *,
+        name=None,
+        plot_chance_level=False,
+        chance_level_kw=None,
+        **kwargs,
+    ):
+        """Plot visualization.
+
+        Extra keyword arguments will be passed to plotly's `add_trace` method.
+
+        Parameters
+        ----------
+        fig : Plotly's Figure, default=None
+            Figure object to plot on. If `None`, a new Figure is
+            created.
+
+        name : str, default=None
+            Name of precision recall curve for labeling. If `None`, use
+            `estimator_name` if not `None`, otherwise no labeling is shown.
+
+        plot_chance_level : bool, default=False
+            Whether to plot the chance level. The chance level is the prevalence
+            of the positive label computed from the data passed during
+            :meth:`from_predictions` call.
+
+        chance_level_kw : dict, default=None
+            Keyword arguments to be passed to plotly's `add_trace` for rendering
+            the chance level line.
+
+        **kwargs : dict
+            Keyword arguments to be passed to plotly's `add_trace`.
+
+        Returns
+        -------
+        display : :class:`~scripts_thesis.ml_display.PrecisionRecallDisplayPlotly`
+            Object that stores computed values.
+        """
+
+        #Setting up the params of the graphs
+        fold = kwargs.get('fold', None)
+        n_splits = kwargs.get('n_splits', None)
+
+        if (type(fold)==int) & (type(n_splits)==int) & (name is None):
+            name = f"Fold {1 + fold // n_splits} - {fold % n_splits + 1} - (AP = {self.average_precision:0.2f})"
+        elif name is None:
+            name=f"Precision Recall curve - Recall = {self.average_precision:0.2f}"
+
+        #Setting up the graph
+        if fig is None:
+            fig = go.Figure()
+
+        fig.add_trace(go.Scatter(x=self.recall,
+                                 y=self.precision,
+                                 opacity=0.3,
+                                 mode='lines',
+                                 name=name,
+                                 showlegend=True
+                                )
+                    )
+
+        #Add a chance level variable
+        if plot_chance_level:
+
+            if self.prevalence_pos_label is None:
+                raise ValueError(
+                    "You must provide prevalence_pos_label when constructing the "
+                    "PrecisionRecallDisplay object in order to plot the chance "
+                    "level line. Alternatively, you may use "
+                    "PrecisionRecallDisplay.from_estimator or "
+                    "PrecisionRecallDisplay.from_predictions "
+                    "to automatically set prevalence_pos_label"
+                )
+
+            chance_level_line_kw = dict(width=2, dash='dash')
+
+            if chance_level_kw is not None:
+                chance_level_line_kw.update(**chance_level_kw)
+
+            fig.add_trace(go.Scatter(x=[0, 1],
+                                     y=[self.prevalence_pos_label, self.prevalence_pos_label],
+                                     mode='lines',
+                                     name=f"Chance Level - AC = {self.pos_label:0.2f}",
+                                     line = chance_level_line_kw
+                            )
+                )
+
+        info_pos_label = (f"- Positive label: {self.pos_label}" if self.pos_label is not None else "")
+        xlabel = "Recall" + info_pos_label
+        ylabel = "Precision" + info_pos_label
+
+        fig.update_layout(
+                xaxis=dict(range=[-0.05, 1.05], title=xlabel),
+                yaxis=dict(range=[-0.05, 1.05], title=ylabel),
+                title="Precision Recall Curve",
+                legend=dict(yanchor="bottom",
+                            y=0.0,
+                            xanchor="right",
+                            x=0.99,
+                            )
+                )
+
+        self.fig = fig
+
+        if kwargs.get("show_fig", True):
+            fig.show()
+
+        return self
+
+    @classmethod
+    def from_predictions(
+        cls,
+        y_true,
+        y_pred,
+        *,
+        sample_weight=None,
+        pos_label=None,
+        drop_intermediate=False,
+        name=None,
+        fig=None,
+        plot_chance_level=False,
+        chance_level_kw=None,
+        **kwargs,
+    ):
+        """
+        Plot precision-recall curve given binary class predictions.
+
+        Parameters
+        ----------
+        y_true : array-like of shape (n_samples,)
+            True binary labels.
+
+        y_pred : array-like of shape (n_samples,)
+            Estimated probabilities or output of decision function.
+
+        sample_weight : array-like of shape (n_samples,), default=None
+            Sample weights.
+
+        pos_label : int, float, bool or str, default=None
+            The class considered as the positive class when computing the
+            precision and recall metrics.
+
+        drop_intermediate : bool, default=False
+            Whether to drop some suboptimal thresholds which would not appear
+            on a plotted precision-recall curve. This is useful in order to
+            create lighter precision-recall curves.
+
+        name : str, default=None
+            Name for labeling curve. If `None`, name will be set to
+            `"Classifier"`.
+
+        fig : plotly.graph_objects.Figure, default=None
+            Figure object to plot on. If `None`, a new go.Figure is created.
+
+        plot_chance_level : bool, default=False
+            Whether to plot the chance level. The chance level is the prevalence
+            of the positive label computed from the data passed during
+           :meth:`from_predictions` call.
+
+        chance_level_kw : dict, default=None
+            Keyword arguments to be passed to plotly's `plot` for rendering
+            the chance level line.
+
+        Returns
+        -------
+        display : :class:`~scripts_thesis.ml_display.PrecisionRecallDisplayPlotly`
+        """
+
+        precision, recall, _ = precision_recall_curve(
+            y_true,
+            y_pred,
+            pos_label=pos_label,
+            sample_weight=sample_weight,
+            drop_intermediate=drop_intermediate,
+        )
+        average_precision = average_precision_score(
+            y_true, y_pred, pos_label=pos_label, sample_weight=sample_weight
+        )
+
+        class_count = Counter(y_true)
+        prevalence_pos_label = class_count[pos_label] / sum(class_count.values())
+
+        viz = PrecisionRecallDisplayPlotly(
+            precision=precision,
+            recall=recall,
+            average_precision=average_precision,
+            estimator_name=name,
+            pos_label=pos_label,
+            prevalence_pos_label=prevalence_pos_label,
+        )
+
+        return viz.plot(fig=fig,
+                        name=name,
+                        plot_chance_level=plot_chance_level,
+                        chance_level_kw=chance_level_kw,
+                        **kwargs)
