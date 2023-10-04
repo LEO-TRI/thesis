@@ -129,6 +129,8 @@ class RocCurveDisplayPlotly():
             The class instance via its .plot() method
         """
 
+        breakpoint()
+
         fpr, tpr, _ = sklearn.metrics.roc_curve(
             y_true,
             y_pred,
@@ -378,7 +380,6 @@ class PrecisionRecallDisplayPlotly():
             y_pred,
             pos_label=pos_label,
             sample_weight=sample_weight,
-            drop_intermediate=drop_intermediate,
         )
         average_precision = average_precision_score(
             y_true, y_pred, pos_label=pos_label, sample_weight=sample_weight
