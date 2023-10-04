@@ -369,7 +369,7 @@ def graphs_cross_val(auc_metrics: dict, n_splits: int= 5):
     sample_length = len(auc_metrics.get("test_array"))
     sample = np.random.choice(sample_length, int(sample_length/2), replace=False)
 
-    auc_metrics = {k : np.array(v)[sample] for k, v in auc_metrics.items()}
+    auc_metrics = {k : np.array(v)[[sample], :] for k, v in auc_metrics.items()}
 
     plot_confusion_matrix(**auc_metrics)
 
