@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import seaborn as sns
 
-from sklearn.metrics import accuracy_score, f1_score, confusion_matrix, precision_score, auc
+from sklearn.metrics import accuracy_score, f1_score, precision_score, confusion_matrix, auc
 
 from scripts_thesis.utils import *
 from scripts_thesis.charter import *
@@ -96,6 +96,8 @@ def plot_confusion_matrix(test_array: np.ndarray, target_array: np.ndarray, widt
         ),
         font=dict(family='Arial', color='black')
         )
+
+    fig.show()
 
     return fig
 
@@ -346,6 +348,58 @@ def _prc_curve(test_array: np.ndarray, target_array: np.ndarray, n_splits: int, 
 
     return fig
 
+def metrics_on_one_plot(test_array: np.ndarray, target_array: np.ndarray):
+
+    if set(target_array[0]) == set([0, 1]):
+        raise ValueError("Probabilities must be passed in 'target_array'")
+
+    thresholds = np.linspace(0, 1, 100)
+
+    #3D array with axis 0 being thresholds, axis 1 being metrics and axis 2 being folds
+    results = np.zeros((len(thresholds), 4, len(test_array)))
+
+    for fold, (y_test, y_pred) in enumerate(zip(test_array, target_array)):
+
+        for i, threshold in enumerate(thresholds):
+
+            y_pred= np.where(y_pred>=threshold, 1, 0)
+            results[i,:,fold] = [accuracy_score(y_test, y_pred),
+                                 precision_score(y_test, y_pred),
+                                 f1_score(y_test, y_pred),
+                                 queue_rate(y_pred, threshold)]
+
+
+    means = np.mean(results, axis=2, keepdims=False)
+    stds = np.std(results, axis=2, keepdims=False)
+
+    means_plus = means + stds
+    means_minus = means - stds
+
+    metrics = ["accuracy", "precision", "f1", "queue_rate"]
+    names = dict(zip(np.arange(len(metrics)), metrics))
+
+    graphs = [dict(type="scatter", x=thresholds, y=means[:,i], name=names.get(i))
+              for i in range(means.shape[1])
+              ]
+
+    graphs.append([dict(type="scatter",
+                        x=list(thresholds) + list(thresholds)[::-1],
+                        y=list(means_plus[:,i]) + list(means_minus[:,i])[::-1],
+                        fill='toself',
+                        showlegend=False,
+                        mode='lines',
+                        opacity=0.3,
+                        line=dict(color=DARK_GREY[1], width=1),
+                        )
+                   for i in range(means_minus.shape[1])
+                   ]
+                  )
+
+    layout = dict(title={"text": "A Figure Specified By A Graph Object With A Dictionary"})
+
+    fig = go.Figure(data=graphs, layout=layout)
+    fig.show()
+
 
 def graphs_cross_val(auc_metrics: dict, n_splits: int= 5):
     """
@@ -369,7 +423,7 @@ def graphs_cross_val(auc_metrics: dict, n_splits: int= 5):
     sample_length = len(auc_metrics.get("test_array"))
     sample = np.random.choice(sample_length, int(sample_length/2), replace=False)
 
-    auc_metrics = {k : np.array(v)[[sample], :] for k, v in auc_metrics.items()}
+    auc_metrics = {k : np.array(v)[[sample], :].reshape(len(sample), len(v[0])) for k, v in auc_metrics.items()}
 
     plot_confusion_matrix(**auc_metrics)
 
