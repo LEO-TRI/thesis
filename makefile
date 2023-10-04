@@ -13,7 +13,7 @@ optimise:
 	python -c "from scripts_thesis.main import ModelFlow; ml = ModelFlow(); ml.optimise(classifiers='$(classifier)', n_iter=$(n_iter))"
 
 train:
-	python -c "from scripts_thesis.main import ModelFlow; ml = ModelFlow(); ml.train(classifiers='$(classifier)')"
+	python -c "from scripts_thesis.main import ModelFlow; ml = ModelFlow(); ml.train(n_splits=$(n_splits), classifiers='$(classifier)')"
 
 model_viz:
 	python -c "from scripts_thesis.main import ModelFlow; ml = ModelFlow(); ml.model_viz()"
