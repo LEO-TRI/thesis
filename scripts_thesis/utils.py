@@ -354,3 +354,16 @@ def queue_rate(y_pred: np.ndarray, threshold: float):
         _description_
     """
     return np.mean((y_pred >= threshold))
+
+class ListPad(list):
+    def lpad(self, n, fillvalue=0):
+        return (self + [fillvalue] * n)[:n] 
+    
+def flatten_list(lst):
+    flattened = []
+    for item in lst:
+        if isinstance(item, list):
+            flattened.extend(flatten_list(item))
+        else:
+            flattened.append(item)
+    return flattened
