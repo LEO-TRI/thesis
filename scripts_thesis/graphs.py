@@ -45,12 +45,12 @@ def plot_confusion_matrix(test_array: np.ndarray, target_array: np.ndarray, widt
 
     if len(test_array) != len(target_array):
         raise ValueError("test_array and target_array must have the same shape")
-    
+
 
     if is_array_like(test_array[0]):
         test_array = np.concatenate(test_array)
         target_array = np.concatenate(target_array)
-    
+
     breakpoint()
 
     if set(target_array) != set([0, 1]):
@@ -352,30 +352,31 @@ def _prc_curve(test_array: np.ndarray, target_array: np.ndarray, n_splits: int, 
     return fig
 
 def metrics_on_one_plot(test_array: list, target_array: list) -> go.Figure:
-    """_summary_
+    """
+    Creates a threshold curve with accuracy, precision, recall and f1 score
 
     Parameters
     ----------
     test_array : list
-        _description_
+        A list of arrays of y_test values
     target_array : list
-        _description_
+        A list of arrays of y_pred values
 
     Returns
     -------
     go.Figure
-        _description_
+        A figure with 5 line traces on it
 
     Raises
     ------
     ValueError
-        _description_
+        In case someone passes predictions rather than probabilities
     """
 
     if set(target_array[0]) == set([0, 1]):
         raise ValueError("Probabilities must be passed in 'target_array' to examine thresholds")
 
-    thresholds = np.linspace(0, 1, len(np.unique(target_array)))
+    thresholds = np.linspace(0, 1, 500)
 
     metrics = ["accuracy", "precision", "recall", "f1", "queue_rate"]
     names = dict(zip(np.arange(len(metrics)), metrics))
@@ -393,17 +394,19 @@ def metrics_on_one_plot(test_array: list, target_array: list) -> go.Figure:
                                 recall_score(y_test, y_pred, zero_division=0),
                                 f1_score(y_test, y_pred),
                                 queue_rate(y_pred, threshold)]
-    
+
     means = np.mean(results, axis=2, keepdims=False)
     stds = np.std(results, axis=2, keepdims=False)
 
     means_plus = means + 1.96 * stds/np.sqrt(results.shape[2])
     means_minus = means - 1.96 * stds/np.sqrt(results.shape[2])
 
+    max_indices = np.argmax(means, axis=0, keepdims=False)
+
     #Add metrics lines
-    graphs = [dict(type="scatter", 
-                x=thresholds, 
-                y=means[:,i], 
+    graphs = [dict(type="scatter",
+                x=thresholds,
+                y=means[:,i],
                 name=names.get(i),
                 mode="lines",
                 marker=dict(color=PALETTE[i % len(PALETTE), 0])#, width=2),
@@ -411,7 +414,7 @@ def metrics_on_one_plot(test_array: list, target_array: list) -> go.Figure:
             for i in range(means.shape[1])
             ]
 
-    #Add confidence intervals 
+    #Add confidence intervals
     graphs_ci = [dict(type="scatter",
                         x=np.array(list(thresholds) + list(thresholds)[::-1]),
                         y=np.array(list(means_plus[:,i]) + list(means_minus[:,i])[::-1]),
@@ -425,7 +428,16 @@ def metrics_on_one_plot(test_array: list, target_array: list) -> go.Figure:
                    for i in range(means.shape[1])
                    ]
 
-    graphs = graphs + graphs_ci                 
+    graphs_vertical = [dict(type="scatter",
+                            x=[means[max_indices[3]], means[max_indices[3]]],
+                            y=[0,1],
+                            name="Best F1 score",
+                            mode='lines',
+                            line=dict(color=BLUE_GREY[1], width=1, dash='dash')
+                            )
+                       ]
+
+    graphs = graphs + graphs_ci + graphs_vertical
 
     layout = dict(title={"text": "Threshold plot"})
 
@@ -436,7 +448,7 @@ def metrics_on_one_plot(test_array: list, target_array: list) -> go.Figure:
 
 def graphs_cross_val(auc_metrics: dict, n_splits: int= 5):
     """
-    Centralises the calls for the various graph functions in one place 
+    Centralises the calls for the various graph functions in one place
 
     Parameters
     ----------
@@ -457,9 +469,9 @@ def graphs_cross_val(auc_metrics: dict, n_splits: int= 5):
     sample = np.random.choice(sample_length, int(sample_length/2), replace=False)
 
     #p.array(v)[[sample], :].reshape(len(sample), len(v[0])
-    auc_metrics = {k : [val for i, val in enumerate(v) if i in sample] for k, v in auc_metrics.items()}
+    auc_metrics = {k : [list(val) for i, val in enumerate(v) if i in sample] for k, v in auc_metrics.items()}
 
-    metrics_on_one_plot(**auc_metrics)
     plot_confusion_matrix(**auc_metrics)
+    metrics_on_one_plot(**auc_metrics)
 
     return (_auc_curve(**auc_metrics, n_splits=n_splits), _prc_curve(**auc_metrics, n_splits=n_splits))
