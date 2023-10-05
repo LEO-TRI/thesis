@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import seaborn as sns
 
-from sklearn.metrics import accuracy_score, f1_score, precision_score, confusion_matrix, auc
+from sklearn.metrics import accuracy_score, f1_score, recall_score, precision_score, confusion_matrix, auc
 
 from scripts_thesis.utils import *
 from scripts_thesis.charter import *
@@ -43,12 +43,15 @@ def plot_confusion_matrix(test_array: np.ndarray, target_array: np.ndarray, widt
         A confusion matrix of the model's result
     """
 
-    if test_array.shape != target_array.shape:
+    if len(test_array) != len(target_array):
         raise ValueError("test_array and target_array must have the same shape")
+    
 
     if is_array_like(test_array[0]):
-        test_array = np.ravel(test_array)
-        target_array = np.ravel(target_array)
+        test_array = np.concatenate(test_array)
+        target_array = np.concatenate(target_array)
+    
+    breakpoint()
 
     if set(target_array) != set([0, 1]):
         target_array = np.where(target_array>=0.5, 1, 0)
@@ -348,67 +351,97 @@ def _prc_curve(test_array: np.ndarray, target_array: np.ndarray, n_splits: int, 
 
     return fig
 
-def metrics_on_one_plot(test_array: np.ndarray, target_array: np.ndarray):
+def metrics_on_one_plot(test_array: list, target_array: list) -> go.Figure:
+    """_summary_
+
+    Parameters
+    ----------
+    test_array : list
+        _description_
+    target_array : list
+        _description_
+
+    Returns
+    -------
+    go.Figure
+        _description_
+
+    Raises
+    ------
+    ValueError
+        _description_
+    """
 
     if set(target_array[0]) == set([0, 1]):
-        raise ValueError("Probabilities must be passed in 'target_array'")
+        raise ValueError("Probabilities must be passed in 'target_array' to examine thresholds")
 
-    thresholds = np.linspace(0, 1, 100)
+    thresholds = np.linspace(0, 1, len(np.unique(target_array)))
+
+    metrics = ["accuracy", "precision", "recall", "f1", "queue_rate"]
+    names = dict(zip(np.arange(len(metrics)), metrics))
 
     #3D array with axis 0 being thresholds, axis 1 being metrics and axis 2 being folds
-    results = np.zeros((len(thresholds), 4, len(test_array)))
+    results = np.zeros((len(thresholds), len(metrics), len(test_array)))
 
-    for fold, (y_test, y_pred) in enumerate(zip(test_array, target_array)):
+    for fold, (y_test, y_proba) in enumerate(zip(test_array, target_array)):
 
         for i, threshold in enumerate(thresholds):
 
-            y_pred= np.where(y_pred>=threshold, 1, 0)
+            y_pred = np.where(y_proba>=threshold, 1, 0)
             results[i,:,fold] = [accuracy_score(y_test, y_pred),
-                                 precision_score(y_test, y_pred),
-                                 f1_score(y_test, y_pred),
-                                 queue_rate(y_pred, threshold)]
-
-
+                                precision_score(y_test, y_pred, zero_division=1),
+                                recall_score(y_test, y_pred, zero_division=0),
+                                f1_score(y_test, y_pred),
+                                queue_rate(y_pred, threshold)]
+    
     means = np.mean(results, axis=2, keepdims=False)
     stds = np.std(results, axis=2, keepdims=False)
 
-    means_plus = means + stds
-    means_minus = means - stds
+    means_plus = means + 1.96 * stds/np.sqrt(results.shape[2])
+    means_minus = means - 1.96 * stds/np.sqrt(results.shape[2])
 
-    metrics = ["accuracy", "precision", "f1", "queue_rate"]
-    names = dict(zip(np.arange(len(metrics)), metrics))
+    #Add metrics lines
+    graphs = [dict(type="scatter", 
+                x=thresholds, 
+                y=means[:,i], 
+                name=names.get(i),
+                mode="lines",
+                marker=dict(color=PALETTE[i % len(PALETTE), 0])#, width=2),
+                )
+            for i in range(means.shape[1])
+            ]
 
-    graphs = [dict(type="scatter", x=thresholds, y=means[:,i], name=names.get(i))
-              for i in range(means.shape[1])
-              ]
-
-    graphs.append([dict(type="scatter",
-                        x=list(thresholds) + list(thresholds)[::-1],
-                        y=list(means_plus[:,i]) + list(means_minus[:,i])[::-1],
+    #Add confidence intervals 
+    graphs_ci = [dict(type="scatter",
+                        x=np.array(list(thresholds) + list(thresholds)[::-1]),
+                        y=np.array(list(means_plus[:,i]) + list(means_minus[:,i])[::-1]),
                         fill='toself',
                         showlegend=False,
                         mode='lines',
+                        hoverinfo="skip",
                         opacity=0.3,
-                        line=dict(color=DARK_GREY[1], width=1),
+                        line=dict(color=DARK_GREY[1])#, width=1),
                         )
-                   for i in range(means_minus.shape[1])
+                   for i in range(means.shape[1])
                    ]
-                  )
 
-    layout = dict(title={"text": "A Figure Specified By A Graph Object With A Dictionary"})
+    graphs = graphs + graphs_ci                 
+
+    layout = dict(title={"text": "Threshold plot"})
 
     fig = go.Figure(data=graphs, layout=layout)
+
     fig.show()
 
 
 def graphs_cross_val(auc_metrics: dict, n_splits: int= 5):
     """
-    A function to produce a figure with several ROC curves when cross-validating a model
+    Centralises the calls for the various graph functions in one place 
 
     Parameters
     ----------
     auc_metrics : dict
-        A dictionnary containing lists of lists for respectively y_test, y_pred or y_pred proba by cv fold
+        A dictionnary containing lists of lists for respectively y_test, y_pred or y_proba by cv fold
     n_splits : int, optional
         Number of folds by cv, by default 5
 
@@ -423,8 +456,10 @@ def graphs_cross_val(auc_metrics: dict, n_splits: int= 5):
     sample_length = len(auc_metrics.get("test_array"))
     sample = np.random.choice(sample_length, int(sample_length/2), replace=False)
 
-    auc_metrics = {k : np.array(v)[[sample], :].reshape(len(sample), len(v[0])) for k, v in auc_metrics.items()}
+    #p.array(v)[[sample], :].reshape(len(sample), len(v[0])
+    auc_metrics = {k : [val for i, val in enumerate(v) if i in sample] for k, v in auc_metrics.items()}
 
+    metrics_on_one_plot(**auc_metrics)
     plot_confusion_matrix(**auc_metrics)
 
     return (_auc_curve(**auc_metrics, n_splits=n_splits), _prc_curve(**auc_metrics, n_splits=n_splits))
