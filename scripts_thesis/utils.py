@@ -336,3 +336,21 @@ def is_array_like(obj) -> bool:
     """
 
     return (type(obj) == np.ndarray) | (type(obj) == list) | (type(obj) == pd.Series)
+
+def queue_rate(y_pred: np.ndarray, threshold: float):
+    """
+    _summary_
+
+    Parameters
+    ----------
+    y_pred : np.ndarray
+        _description_
+    threshold : float
+        _description_
+
+    Returns
+    -------
+    _type_
+        _description_
+    """
+    return np.mean((y_pred >= threshold))

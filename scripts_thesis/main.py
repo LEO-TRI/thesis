@@ -227,6 +227,8 @@ class ModelFlow(LoadDataMixin, DataLoader):
         full_file_path = os.path.join(LOCAL_IMAGE_PATH, filename2)
         fig2.write_image(file =full_file_path, format="png")
 
+        print(Fore.MAGENTA + "\nSaving done..." + Style.RESET_ALL)
+        print(Fore.MAGENTA + "\n  ✅ Training accomplished, well done Captain..." + Style.RESET_ALL)
 
     def evaluate(file_name: str = None, target: str = "license") -> pd.DataFrame:
         """

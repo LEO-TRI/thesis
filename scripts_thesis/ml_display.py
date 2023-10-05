@@ -129,7 +129,6 @@ class RocCurveDisplayPlotly():
             The class instance via its .plot() method
         """
 
-        breakpoint()
 
         fpr, tpr, _ = sklearn.metrics.roc_curve(
             y_true,
