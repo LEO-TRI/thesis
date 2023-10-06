@@ -1,14 +1,11 @@
 import numpy as np
 import pandas as pd
-import tensorflow as tf
 
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import seaborn as sns
 
 from scipy import stats, sparse
-
-from sklearn.feature_selection import chi2, SelectFpr, SelectFwe
 
 hex_colors = [mcolors.to_hex(color) for color in sns.diverging_palette(145, 300, s=60, n=5)]
 hex_colors.reverse()
@@ -337,33 +334,24 @@ def is_array_like(obj) -> bool:
 
     return (type(obj) == np.ndarray) | (type(obj) == list) | (type(obj) == pd.Series)
 
-def queue_rate(y_pred: np.ndarray, threshold: float):
+def queue_rate(y_pred: np.ndarray, threshold: float) -> float:
     """
-    _summary_
+    Computes the queue rate for a model
 
     Parameters
     ----------
     y_pred : np.ndarray
-        _description_
+        The array of predicted probas from a model
     threshold : float
-        _description_
+        The threshold of the model
 
     Returns
     -------
-    _type_
-        _description_
+    float
+        The proportion of values above the treshold
     """
     return np.mean((y_pred >= threshold))
 
 class ListPad(list):
     def lpad(self, n, fillvalue=0):
-        return (self + [fillvalue] * n)[:n] 
-    
-def flatten_list(lst):
-    flattened = []
-    for item in lst:
-        if isinstance(item, list):
-            flattened.extend(flatten_list(item))
-        else:
-            flattened.append(item)
-    return flattened
+        return (self + [fillvalue] * n)[:n]
