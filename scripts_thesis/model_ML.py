@@ -7,7 +7,7 @@ from sklearn.metrics import accuracy_score, precision_score, f1_score, recall_sc
 from sklearn.decomposition import PCA, TruncatedSVD
 from sklearn.feature_selection import SelectKBest, chi2
 
-from sklearn.preprocessing import RobustScaler, OneHotEncoder, FunctionTransformer, MinMaxScaler
+from sklearn.preprocessing import RobustScaler, OneHotEncoder, FunctionTransformer
 from sklearn.pipeline import FeatureUnion, Pipeline
 from sklearn.compose import ColumnTransformer
 
@@ -210,9 +210,11 @@ def build_pipeline(numeric_cols: list[str], text_cols: list[str], other_cols: li
         clf = StackingClassifier(estimators=estimators, final_estimator=classifiers.get("logistic"))
         classifiers[classifier] = clf
 
-    classifier_model = classifiers.get(classifier, None)
+
     if classifier not in classifiers.keys():
         raise ValueError("Invalid classifier name. Choose 'logistic', 'gbt', 'random_forest', 'sgd', 'gNB', 'xgb' or 'stacked'.")
+
+    classifier_model = classifiers.get(classifier, None)
 
     #Adding an additional step for classifiers that require dense array
     if (classifier == "gbt") | (classifier == 'stacked') | (classifier == "gNB") | (classifier == "xgb"):
@@ -224,6 +226,7 @@ def build_pipeline(numeric_cols: list[str], text_cols: list[str], other_cols: li
             pipeline.steps.append(['dimensionality_reducer', SelectKBest(chi2, k=200)])
 
     #Adding a classifier head to the pipeline
+    pipeline.steps.append(["pca", PCA(150)])
     pipeline.steps.append(['classifier', classifier_model])
 
     return pipeline
