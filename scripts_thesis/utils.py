@@ -336,19 +336,20 @@ def is_array_like(obj) -> bool:
 
 def queue_rate(y_pred: np.ndarray, threshold: float) -> float:
     """
-    Computes the queue rate for a model
+    Computes the queue of items to be reviewed depending on a 
+    threshold for a classification model.
 
     Parameters
     ----------
     y_pred : np.ndarray
         The array of predicted probas from a model
     threshold : float
-        The threshold of the model
+        The threshold for the model
 
     Returns
     -------
     float
-        The proportion of values above the treshold
+        The proportion of values above the treshold and classified as 1 
     """
     return np.mean((y_pred >= threshold))
 

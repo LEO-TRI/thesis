@@ -51,7 +51,6 @@ def plot_confusion_matrix(test_array: np.ndarray, target_array: np.ndarray, widt
         test_array = np.concatenate(test_array)
         target_array = np.concatenate(target_array)
 
-    breakpoint()
 
     if set(target_array) != set([0, 1]):
         target_array = np.where(target_array>=0.5, 1, 0)
@@ -375,6 +374,9 @@ def metrics_on_one_plot(test_array: list, target_array: list) -> go.Figure:
 
     if set(target_array[0]) == set([0, 1]):
         raise ValueError("Probabilities must be passed in 'target_array' to examine thresholds")
+    
+    if len(test_array) !=  len(target_array):
+        raise ValueError("Predicted and actual values must have the same length")
 
     thresholds = np.linspace(0, 1, 500)
 
@@ -393,7 +395,8 @@ def metrics_on_one_plot(test_array: list, target_array: list) -> go.Figure:
                                 precision_score(y_test, y_pred, zero_division=1),
                                 recall_score(y_test, y_pred, zero_division=0),
                                 f1_score(y_test, y_pred),
-                                queue_rate(y_pred, threshold)]
+                                queue_rate(y_pred, threshold)
+                                ]
 
     means = np.mean(results, axis=2, keepdims=False)
     stds = np.std(results, axis=2, keepdims=False)
@@ -429,18 +432,19 @@ def metrics_on_one_plot(test_array: list, target_array: list) -> go.Figure:
                    ]
 
     graphs_vertical = [dict(type="scatter",
-                            x=[means[max_indices[3]], means[max_indices[3]]],
+                            x=[thresholds[max_indices[3]], thresholds[max_indices[3]]],
                             y=[0,1],
                             name="Best F1 score",
                             mode='lines',
-                            line=dict(color=BLUE_GREY[1], width=1, dash='dash')
+                            line=dict(color=BLUE_GREY[1], width=3, dash='dash')
                             )
                        ]
-
+    
     graphs = graphs + graphs_ci + graphs_vertical
 
-    layout = dict(title={"text": "Threshold plot"})
-
+    layout = dict(title={"text": "Threshold plot", 'font': {'size': 20}},
+                  xaxis={"title": "Thresholds"},
+                  yaxis={"title": "Score", "range": [-0.05, 1]})
     fig = go.Figure(data=graphs, layout=layout)
 
     fig.show()
