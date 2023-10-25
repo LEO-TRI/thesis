@@ -288,7 +288,7 @@ class PrecisionRecallDisplayPlotly():
             fig.add_trace(go.Scatter(x=[0, 1],
                                      y=[self.prevalence_pos_label, self.prevalence_pos_label],
                                      mode='lines',
-                                     name=f"Chance Level - AC = {self.pos_label:0.2f}",
+                                     name=f"Chance Level - AC = {self.prevalence_pos_label:0.2f}",
                                      line = chance_level_line_kw
                             )
                 )

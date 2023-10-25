@@ -70,6 +70,7 @@ def plot_confusion_matrix(test_array: np.ndarray, target_array: np.ndarray, widt
     acc = accuracy_score(test_array, target_array)
     f1s = f1_score(test_array, target_array)
     precision = precision_score(test_array, target_array)
+    recall = recall_score(test_array, target_array)
 
     fig = go.Figure()
 
@@ -86,7 +87,7 @@ def plot_confusion_matrix(test_array: np.ndarray, target_array: np.ndarray, widt
                    )
 
     fig.update_layout(#<br> is a line break, and <sup> is superscript
-        title=f'Confusion Matrix : Overall results <br><sup>Accuracy: {acc:.2f}, F1: {f1s:.2f}, Precision: {precision:.2f}</sup>',
+        title=f'Confusion Matrix : Overall results <br><sup>Accuracy: {acc:.2f}, F1: {f1s:.2f}, Precision: {precision:.2f}, Recall: {recall:.2f}</sup>',
         xaxis=dict(title='Predicted'),
         yaxis=dict(title='Actual'),
         width=width,
@@ -374,7 +375,7 @@ def metrics_on_one_plot(test_array: list, target_array: list) -> go.Figure:
 
     if set(target_array[0]) == set([0, 1]):
         raise ValueError("Probabilities must be passed in 'target_array' to examine thresholds")
-    
+
     if len(test_array) !=  len(target_array):
         raise ValueError("Predicted and actual values must have the same length")
 
@@ -439,7 +440,7 @@ def metrics_on_one_plot(test_array: list, target_array: list) -> go.Figure:
                             line=dict(color=BLUE_GREY[1], width=3, dash='dash')
                             )
                        ]
-    
+
     graphs = graphs + graphs_ci + graphs_vertical
 
     layout = dict(title={"text": "Threshold plot", 'font': {'size': 20}},

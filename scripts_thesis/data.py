@@ -67,7 +67,7 @@ class GraphLoader:
             A DataFrame suitable for graphical exploration
         """
 
-        df_graph = self.get_data(graph=graph)
+        df_graph = self.get_data(is_graph=graph)
         df_graph["arr"] = df_graph["c_quinsee"].map(lambda row: str(row)[2:4])
 
         upper_bound = np.quantile(df_graph["price"], 0.75) * 10

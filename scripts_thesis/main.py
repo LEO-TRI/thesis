@@ -58,6 +58,7 @@ class ModelFlow(LoadDataMixin, DataLoader):
 
     def __init__(self) -> None:
         super().__init__() #Brings back load_raw_data. Used as a test for mixin
+        self.file_name = None
 
 
     def preprocess(self, has_model: bool=True) -> pd.DataFrame:
@@ -176,7 +177,11 @@ class ModelFlow(LoadDataMixin, DataLoader):
         return tuned_results.get(best_model_ind) #Return the best model
 
 
-    def train(self, file_name: str = None, target: str = "license", test_split: float = 0.3, n_splits: int=5, classifiers: str="logistic") -> None:
+    def train(self, file_name: str = None,
+              target: str = "license",
+              test_split: float = 0.3,
+              n_splits: int=5,
+              classifier: str="logistic") -> None:
         """
         Load data from the data folder.
 
@@ -193,7 +198,7 @@ class ModelFlow(LoadDataMixin, DataLoader):
         test_split : float, optional
             The train test split, by default 0.3
         classifier : str, optional
-            The classifier to use in the pipeline ('logistic', 'gbt', or 'random_forest', 'sgd' or 'stacked'), by default 'logistic'.
+            The classifier to use in the pipeline ('logistic', 'gbt', 'random_forest', 'gNB', 'xgb', or 'stacked'), by default 'logistic'.
         """
 
         print(Fore.MAGENTA + "\n⭐️ Use case: train" + Style.RESET_ALL)
@@ -205,32 +210,32 @@ class ModelFlow(LoadDataMixin, DataLoader):
 
         print(Fore.MAGENTA + "\nTraining model..." + Style.RESET_ALL)
 
-        model, results, auc_metrics = train_model(X, y, test_split, classifier=classifiers, n_splits=n_splits) #auc_metrics = {test_list, proba_list}
+        model, results, auc_metrics = train_model(X, y, test_split, classifier=classifier, n_splits=n_splits) #auc_metrics = {test_list, proba_list}
         fig1, fig2 = graphs_cross_val(auc_metrics) #Producing the cross_val metrics
 
         print(Fore.MAGENTA + "\n ✅ Training finished, saving model and graph..." + Style.RESET_ALL)
 
         model_iteration = len(os.listdir(LOCAL_MODEL_PATH)) + 1
-        file_name = f'model_V{model_iteration}.pkl'
+        file_name = f'model_V{model_iteration}_{classifier}.pkl'
         full_file_path = os.path.join(LOCAL_MODEL_PATH, file_name)
         pickle.dump(model, open(full_file_path, 'wb'))
 
-        file_name = f'model_train_V{model_iteration}'
+        file_name = f'model_train_V{model_iteration}_{classifier}'
         full_file_path = os.path.join(LOCAL_RESULT_PATH, file_name)
         results.to_csv(full_file_path)
 
-        filename1 = f'auc_curve_{model_iteration}_{classifiers}'
+        filename1 = f'auc_curve_{model_iteration}_{classifier}'
         full_file_path = os.path.join(LOCAL_IMAGE_PATH, filename1)
         fig1.write_image(file =full_file_path, format="png")
 
-        filename2 = f'prc_curve_{model_iteration}_{classifiers}'
+        filename2 = f'prc_curve_{model_iteration}_{classifier}'
         full_file_path = os.path.join(LOCAL_IMAGE_PATH, filename2)
         fig2.write_image(file =full_file_path, format="png")
 
         print(Fore.MAGENTA + "\nSaving done..." + Style.RESET_ALL)
         print(Fore.MAGENTA + "\n  ✅ Training accomplished, well done Captain..." + Style.RESET_ALL)
 
-    def evaluate(file_name: str = None, target: str = "license") -> pd.DataFrame:
+    def evaluate(self, file_name: str = None, target: str = "license", classifier: str="logistic") -> pd.DataFrame:
         """
         Evaluate the performance of the latest production model on processed data.\n
 
@@ -251,17 +256,18 @@ class ModelFlow(LoadDataMixin, DataLoader):
 
         print(Fore.MAGENTA + "\n⭐️ Use case: evaluate" + Style.RESET_ALL)
 
-        data_processed = DataLoader.load_processed_data(file_name=file_name)
+        #TODO Understand filename not working. file_name = class(MlFlow) instead of none
+        data_processed = DataLoader.load_processed_data(file_name=self.file_name)
         if data_processed is None:
             return None
 
         y= data_processed[target]
         X = data_processed.drop(columns=[target])
 
-        model = load_model()
-
+        model = load_model(classifier = classifier)
 
         results, y_pred, y_test = evaluate_model(model, X, y)
+        y_test = y_test.to_numpy()
 
         plot_confusion_matrix(y_test, y_pred)
 
