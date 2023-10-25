@@ -173,7 +173,8 @@ def params_combiner(classifier: str="logistic", params_clf: dict= None) -> dict:
                        preprocessing__text__text_preprocessing__text3__ngram_range=[(1, 1), (1, 2), (1, 3)],
                        preprocessing__text__text_preprocessing__text1__norm=["l1", "l2"],
                        preprocessing__text__text_preprocessing__text2__norm=["l1", "l2"],
-                       preprocessing__text__text_preprocessing__text3__norm=["l1", "l2"]
+                       preprocessing__text__text_preprocessing__text3__norm=["l1", "l2"],
+                       pca__n_components = np.arange(50, 201, 10)
                        )
 
     if classifier == "logistic":
