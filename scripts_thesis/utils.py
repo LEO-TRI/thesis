@@ -174,7 +174,7 @@ def params_combiner(classifier: str="logistic", params_clf: dict= None) -> dict:
                        preprocessing__text__text_preprocessing__text1__norm=["l1", "l2"],
                        preprocessing__text__text_preprocessing__text2__norm=["l1", "l2"],
                        preprocessing__text__text_preprocessing__text3__norm=["l1", "l2"],
-                       pca__n_components = np.arange(50, 201, 10)
+                       #pca__n_components=np.arange(100, 201, 5)
                        )
 
     if classifier == "logistic":
@@ -337,7 +337,7 @@ def is_array_like(obj) -> bool:
 
 def queue_rate(y_pred: np.ndarray, threshold: float) -> float:
     """
-    Computes the queue of items to be reviewed depending on a 
+    Computes the queue of items to be reviewed depending on a
     threshold for a classification model.
 
     Parameters
@@ -350,7 +350,7 @@ def queue_rate(y_pred: np.ndarray, threshold: float) -> float:
     Returns
     -------
     float
-        The proportion of values above the treshold and classified as 1 
+        The proportion of values above the treshold and classified as 1
     """
     return np.mean((y_pred >= threshold))
 

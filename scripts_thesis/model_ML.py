@@ -15,11 +15,9 @@ from sklearn.naive_bayes import GaussianNB
 from sklearn.ensemble import HistGradientBoostingClassifier , RandomForestClassifier, StackingClassifier
 from sklearn.linear_model import LogisticRegression, SGDClassifier
 
-import sklearn
-
 #from imblearn.pipeline import Pipeline
-#from imblearn.over_sampling import SMOTE
-#from imblearn.under_sampling import RandomUnderSampler
+from imblearn.over_sampling import SMOTE
+from imblearn.under_sampling import RandomUnderSampler
 
 import xgboost as xgb
 
@@ -110,8 +108,13 @@ def baseline_model(y: np.ndarray, test_split: float=0.3) -> np.ndarray:
     return y_random, y_majority
 
 
-def build_pipeline(numeric_cols: list[str], text_cols: list[str], other_cols: list[str],
-                   classifier: str='logistic', max_features_tfidf: int=10000, max_kbest: int=1000) -> Pipeline:
+def build_pipeline(numeric_cols: list[str],
+                   text_cols: list[str],
+                   other_cols: list[str],
+                   classifier: str='logistic',
+                   max_features_tfidf: int=10000,
+                   max_kbest: int=1000,
+                   is_rebalance: bool=False) -> Pipeline:
     """
     A convenience function created to quickly build a pipeline. Requires the columns' names for the column transformer.
 
@@ -146,14 +149,13 @@ def build_pipeline(numeric_cols: list[str], text_cols: list[str], other_cols: li
     ])
 
 #Added since xgb requires all non-negative inputs
-    if classifier == "xgb":
-        neg_to_pos_transformer = FunctionTransformer(func=neg_to_pos, validate=False)
-        numeric_transformer.steps.append(["neg_to_pos", neg_to_pos_transformer])
+    #if classifier == "xgb":
+    #    neg_to_pos_transformer = FunctionTransformer(func=neg_to_pos, validate=False)
+    #    numeric_transformer.steps.append(["neg_to_pos", neg_to_pos_transformer])
 
     num_transformer = ColumnTransformer(
         transformers=[
-            ('num', numeric_transformer, numeric_cols),
-        ],
+            ('num', numeric_transformer, numeric_cols),],
         remainder='drop'  # Pass through any other columns not specified
     )
 
@@ -186,10 +188,16 @@ def build_pipeline(numeric_cols: list[str], text_cols: list[str], other_cols: li
 
     # Create the final preprocessing pipeline. Further steps can be added with append later
     pipeline = Pipeline([
+        ('preprocessing', column_transformer),
         #("balancing", RandomUnderSampler(random_state=1830)),
-        #('smote', SMOTE(random_state=42, k_neighbors=20)),
-        ('preprocessing', column_transformer)]
+        #('smote', SMOTE(random_state=1830, k_neighbors=20)),
+                        ]
                         )
+
+    if is_rebalance:
+        pipeline.steps.append(("balancing", RandomUnderSampler(random_state=1830)),
+                              ('smote', SMOTE(random_state=1830, k_neighbors=20))
+                              )
 
     #Set the "head" of the pipeline from the potential classifiers
     classifiers = dict(logistic= LogisticRegression(penalty='l2', C=0.9, random_state=1830, solver='liblinear', max_iter=1000, class_weight="balanced"),
@@ -212,7 +220,7 @@ def build_pipeline(numeric_cols: list[str], text_cols: list[str], other_cols: li
 
 
     if classifier not in classifiers.keys():
-        raise ValueError("Invalid classifier name. Choose 'logistic', 'gbt', 'random_forest', 'sgd', 'gNB', 'xgb' or 'stacked'.")
+        raise ValueError("Invalid classifier name. Choose 'logistic', 'gbt', 'random_forest', 'gNB', 'xgb' or 'stacked'.")
 
     classifier_model = classifiers.get(classifier, None)
 
@@ -223,10 +231,11 @@ def build_pipeline(numeric_cols: list[str], text_cols: list[str], other_cols: li
 
     #Reducing dimensionality for the xgb model
         if (classifier == "xgb"):
-            pipeline.steps.append(['dimensionality_reducer', SelectKBest(chi2, k=200)])
+            pass
+            #pipeline.steps.append(['dimensionality_reducer', SelectKBest(chi2, k=200)])
+            #pipeline.steps.append(["pca", PCA(150)])
 
     #Adding a classifier head to the pipeline
-    pipeline.steps.append(["pca", PCA(150)])
     pipeline.steps.append(['classifier', classifier_model])
 
     return pipeline
@@ -319,7 +328,11 @@ def train_model(X: pd.DataFrame, y: pd.Series, test_split: float=0.3, max_featur
     text_cols = ["amenities", "description", "host_about"]
     other_cols = list(set(X.columns) - set(numeric_cols) - set(text_cols))
 
-    pipe_model = build_pipeline(numeric_cols, text_cols, other_cols, max_features_tfidf = max_features, classifier=classifier)
+    pipe_model = build_pipeline(numeric_cols,
+                                text_cols,
+                                other_cols,
+                                max_features_tfidf = max_features,
+                                classifier=classifier)
 
     #Loads back the stored hyperparameters in params.py
     pipe_params = hyperparams_dict.get(classifier)
@@ -453,7 +466,7 @@ def predict_model(model: Pipeline, X: pd.DataFrame) -> np.ndarray:
 
     return model.predict(X), model.predict_proba(X)
 
-def load_model(model_name: str= None) -> Pipeline:
+def load_model(classifier: str, model_name: str= None) -> Pipeline:
     """
     Convenience function to load a pickled model
 
@@ -473,7 +486,7 @@ def load_model(model_name: str= None) -> Pipeline:
         full_file_path = os.path.join(LOCAL_MODEL_PATH, model_name)
 
     if not os.path.exists(full_file_path):
-        files = [os.path.join(LOCAL_MODEL_PATH, file) for file in os.listdir(LOCAL_MODEL_PATH) if file.endswith(".pkl")]
+        files = [os.path.join(LOCAL_MODEL_PATH, file) for file in os.listdir(LOCAL_MODEL_PATH) if all((file.endswith(".pkl"), classifier in file))]
 
         if len(files)==0:
             print("No model trained, please train a model")
