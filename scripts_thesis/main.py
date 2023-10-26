@@ -115,7 +115,7 @@ class ModelFlow(LoadDataMixin, DataLoader):
         return data_clean_pred
 
     #####MODEL#####
-    def optimise(self, file_name: str = None, target: str = "license", classifiers: list[str]=None, n_iter: int=50):
+    def optimise(self, file_name: str = None, target: str = "license", classifier: list[str]=None, n_iter: int=50):
         """
         A method to perform hyperparameters tuning on several classifiers
 
@@ -181,7 +181,9 @@ class ModelFlow(LoadDataMixin, DataLoader):
               target: str = "license",
               test_split: float = 0.3,
               n_splits: int=5,
-              classifier: str="logistic") -> None:
+              classifier: str="logistic",
+              is_rebalance: bool=False, 
+              is_save_graph: bool=False) -> None:
         """
         Load data from the data folder.
 
@@ -210,7 +212,7 @@ class ModelFlow(LoadDataMixin, DataLoader):
 
         print(Fore.MAGENTA + "\nTraining model..." + Style.RESET_ALL)
 
-        model, results, auc_metrics = train_model(X, y, test_split, classifier=classifier, n_splits=n_splits) #auc_metrics = {test_list, proba_list}
+        model, results, auc_metrics = train_model(X, y, test_split, classifier=classifier, n_splits=n_splits, is_rebalance=is_rebalance) #auc_metrics = {test_list, proba_list}
         fig1, fig2 = graphs_cross_val(auc_metrics) #Producing the cross_val metrics
 
         print(Fore.MAGENTA + "\n ✅ Training finished, saving model and graph..." + Style.RESET_ALL)
@@ -220,17 +222,19 @@ class ModelFlow(LoadDataMixin, DataLoader):
         full_file_path = os.path.join(LOCAL_MODEL_PATH, file_name)
         pickle.dump(model, open(full_file_path, 'wb'))
 
-        file_name = f'model_train_V{model_iteration}_{classifier}'
-        full_file_path = os.path.join(LOCAL_RESULT_PATH, file_name)
-        results.to_csv(full_file_path)
 
-        filename1 = f'auc_curve_{model_iteration}_{classifier}'
-        full_file_path = os.path.join(LOCAL_IMAGE_PATH, filename1)
-        fig1.write_image(file =full_file_path, format="png")
+        if is_save_graph:
+            file_name = f'model_train_V{model_iteration}_{classifier}'
+            full_file_path = os.path.join(LOCAL_RESULT_PATH, file_name)
+            results.to_csv(full_file_path)
 
-        filename2 = f'prc_curve_{model_iteration}_{classifier}'
-        full_file_path = os.path.join(LOCAL_IMAGE_PATH, filename2)
-        fig2.write_image(file =full_file_path, format="png")
+            filename1 = f'auc_curve_{model_iteration}_{classifier}'
+            full_file_path = os.path.join(LOCAL_IMAGE_PATH, filename1)
+            fig1.write_image(file =full_file_path, format="png")
+
+            filename2 = f'prc_curve_{model_iteration}_{classifier}'
+            full_file_path = os.path.join(LOCAL_IMAGE_PATH, filename2)
+            fig2.write_image(file =full_file_path, format="png")
 
         print(Fore.MAGENTA + "\nSaving done..." + Style.RESET_ALL)
         print(Fore.MAGENTA + "\n  ✅ Training accomplished, well done Captain..." + Style.RESET_ALL)
@@ -265,6 +269,7 @@ class ModelFlow(LoadDataMixin, DataLoader):
         X = data_processed.drop(columns=[target])
 
         model = load_model(classifier = classifier)
+        print(model)
 
         results, y_pred, y_test = evaluate_model(model, X, y)
         y_test = y_test.to_numpy()

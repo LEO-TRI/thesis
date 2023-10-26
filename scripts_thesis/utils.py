@@ -185,9 +185,11 @@ def params_combiner(classifier: str="logistic", params_clf: dict= None) -> dict:
     elif classifier == "gbt":
         params_clf = dict(classifier__learning_rate=stats.uniform(loc=0, scale=1),
                           classifier__max_depth=np.arange(1, 5),
+                          classifier__max_iter=np.arange(50, 150),
                           classifier__max_leaf_nodes=np.arange(5, 60),
+                          classifier__min_samples_leaf=np.arange(10, 30),
                           classifier__l2_regularization=stats.uniform(loc=0, scale=1),
-                          classifier__max_bins=np.arange(50, 256)
+                          classifier__max_bins=np.arange(20, 256)
                           )
 
     elif classifier == "random_forest":
