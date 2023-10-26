@@ -3,21 +3,22 @@ from sklearn.experimental import enable_iterative_imputer #Required to import It
 from sklearn.impute import IterativeImputer
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.model_selection import train_test_split, RepeatedStratifiedKFold, RandomizedSearchCV
-from sklearn.metrics import accuracy_score, precision_score, f1_score, recall_score, classification_report, make_scorer, roc_auc_score
+from sklearn.metrics import accuracy_score, precision_score, f1_score, recall_score, classification_report, make_scorer, roc_auc_score, average_precision_score
 from sklearn.decomposition import PCA, TruncatedSVD
 from sklearn.feature_selection import SelectKBest, chi2
 
 from sklearn.preprocessing import RobustScaler, OneHotEncoder, FunctionTransformer
-from sklearn.pipeline import FeatureUnion, Pipeline
+from sklearn.pipeline import FeatureUnion#, Pipeline
 from sklearn.compose import ColumnTransformer
 
 from sklearn.naive_bayes import GaussianNB
 from sklearn.ensemble import HistGradientBoostingClassifier , RandomForestClassifier, StackingClassifier
 from sklearn.linear_model import LogisticRegression, SGDClassifier
 
-#from imblearn.pipeline import Pipeline
-from imblearn.over_sampling import SMOTE
+from imblearn.pipeline import Pipeline
 from imblearn.under_sampling import RandomUnderSampler
+from imblearn.over_sampling import SMOTE
+
 
 import xgboost as xgb
 
@@ -59,7 +60,8 @@ def print_results(y_test: np.ndarray, y_pred: np.ndarray, verbose: bool= True, f
                    precision=np.round(precision_score(y_test, y_pred, zero_division= 0), 2),
                    recall=np.round(recall_score(y_test, y_pred, zero_division= 0), 2),
                    f1=np.round(f1_score(y_test, y_pred, zero_division= 0), 2),
-                   roc_auc=np.round(roc_auc_score(y_test, y_pred, average="weighted"), 2)
+                   roc_auc=np.round(roc_auc_score(y_test, y_pred), 2),
+                   precision_recall = np.round(average_precision_score(y_test, y_pred), 2)
                    )
 
 #Add a fold parameter to know from which fold data comes from if cv
@@ -71,6 +73,8 @@ def print_results(y_test: np.ndarray, y_pred: np.ndarray, verbose: bool= True, f
         print(Fore.BLUE + f"Precision: {metrics.get('precision')}"+ Style.RESET_ALL)
         print(Fore.BLUE + f"Recall: {metrics.get('recall')}"+ Style.RESET_ALL)
         print(Fore.BLUE + f"F1 Score: {metrics.get('f1')}"+ Style.RESET_ALL)
+        print(Fore.BLUE + f"AUC Score: {metrics.get('roc_auc')}"+ Style.RESET_ALL)
+        print(Fore.BLUE + f"PRC Score: {metrics.get('precision_recall')}"+ Style.RESET_ALL)
 
     return metrics
 
@@ -187,18 +191,14 @@ def build_pipeline(numeric_cols: list[str],
                                        ])
 
     # Create the final preprocessing pipeline. Further steps can be added with append later
-    pipeline = Pipeline([
-        ('preprocessing', column_transformer),
-        #("balancing", RandomUnderSampler(random_state=1830)),
-        #('smote', SMOTE(random_state=1830, k_neighbors=20)),
-                        ]
+    pipeline = Pipeline([('preprocessing', column_transformer),
+                         ]
                         )
 
     if is_rebalance:
-        pipeline.steps.append(("balancing", RandomUnderSampler(random_state=1830)),
-                              ('smote', SMOTE(random_state=1830, k_neighbors=20))
-                              )
-
+        pipeline.steps.append(['balancing', RandomUnderSampler(random_state=1830)])
+        pipeline.steps.append(["SMOTE", SMOTE()])
+                            
     #Set the "head" of the pipeline from the potential classifiers
     classifiers = dict(logistic= LogisticRegression(penalty='l2', C=0.9, random_state=1830, solver='liblinear', max_iter=1000, class_weight="balanced"),
                        gbt= HistGradientBoostingClassifier(random_state=1830),
@@ -209,15 +209,14 @@ def build_pipeline(numeric_cols: list[str],
                        )
 
     if classifier == "stacked":
-        estimators = [('rf', classifiers.get("random_forest")),
+        estimators = [("gNB", classifiers.get("gNB")),
                       ("gbt", classifiers.get("gbt")),
-                      ("gNB", classifiers.get("gNB"))
+                      ('rf', classifiers.get("random_forest")),
                       ]
 
     #Adding the stacked classifier to the dict of classifiers
         clf = StackingClassifier(estimators=estimators, final_estimator=classifiers.get("logistic"))
         classifiers[classifier] = clf
-
 
     if classifier not in classifiers.keys():
         raise ValueError("Invalid classifier name. Choose 'logistic', 'gbt', 'random_forest', 'gNB', 'xgb' or 'stacked'.")
@@ -294,8 +293,11 @@ def tune_model(X: pd.DataFrame, y: pd.Series,
 
     return rand_search
 
+def build_advanced_pipeline():
+    pass
 
-def train_model(X: pd.DataFrame, y: pd.Series, test_split: float=0.3, max_features: int=1000, n_splits: int= 5, classifier: str='logistic') -> Pipeline:
+
+def train_model(X: pd.DataFrame, y: pd.Series, test_split: float=0.3, max_features: int=1000, n_splits: int= 5, classifier: str='logistic', is_rebalance: bool=False) -> Pipeline:
     """
     Fit the passed model with the passed data and return a fitted model, a DataFrame of metrics and a tuple (y_test, y_pred) or (y_test, y_pred, y_proba)
 
@@ -332,7 +334,8 @@ def train_model(X: pd.DataFrame, y: pd.Series, test_split: float=0.3, max_featur
                                 text_cols,
                                 other_cols,
                                 max_features_tfidf = max_features,
-                                classifier=classifier)
+                                classifier=classifier,
+                                is_rebalance=is_rebalance)
 
     #Loads back the stored hyperparameters in params.py
     pipe_params = hyperparams_dict.get(classifier)

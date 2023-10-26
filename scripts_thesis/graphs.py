@@ -79,7 +79,7 @@ def plot_confusion_matrix(test_array: np.ndarray, target_array: np.ndarray, widt
                    x=[str(col) for col in df_lambda.columns],
                    y=[str(col) for col in df_lambda.columns],
                    colorscale='RdBu_r',
-                   text=df_lambda.values,
+                   text=df_lambda.values * 100,
                    texttemplate="%{text}%",
                    textfont={"size":16},
                    colorbar=dict(title='Proportion'),
