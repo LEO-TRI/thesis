@@ -10,7 +10,7 @@ from colorama import Fore, Style
 from scripts_thesis.data import DataLoader, LoadDataMixin
 from scripts_thesis.model_ML import train_model, evaluate_model, predict_model, load_model, tune_model
 from scripts_thesis.utils import get_top_features, params_extracter
-from scripts_thesis.graphs import model_explainer, plot_confusion_matrix, graphs_cross_val
+from scripts_thesis.graphs import model_explainer, plot_confusion_matrix, graphs_cross_val, probability_distribution
 
 from scripts_thesis.params import *
 from scripts_thesis.preproc import *
@@ -182,7 +182,7 @@ class ModelFlow(LoadDataMixin, DataLoader):
               test_split: float = 0.3,
               n_splits: int=5,
               classifier: str="logistic",
-              is_rebalance: bool=False, 
+              is_rebalance: bool=False,
               is_save_graph: bool=False) -> None:
         """
         Load data from the data folder.
@@ -269,12 +269,13 @@ class ModelFlow(LoadDataMixin, DataLoader):
         X = data_processed.drop(columns=[target])
 
         model = load_model(classifier = classifier)
-        print(model)
+        #print(model)
 
         results, y_pred, y_test = evaluate_model(model, X, y)
         y_test = y_test.to_numpy()
 
         plot_confusion_matrix(y_test, y_pred)
+        probability_distribution(y_test, y_pred)
 
         model_iteration = len(os.listdir(LOCAL_EVALUATE_PATH)) + 1
         file_name = f'model_evaluate_V{model_iteration}'

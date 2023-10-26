@@ -294,6 +294,7 @@ def _auc_curve(test_array: np.ndarray, target_array: np.ndarray, n_splits: int, 
 
     return fig
 
+
 def _prc_curve(test_array: np.ndarray, target_array: np.ndarray, n_splits: int, **kwargs) -> go.Figure:
     """
     A function used to calculate cross_validated precision recall.
@@ -350,6 +351,11 @@ def _prc_curve(test_array: np.ndarray, target_array: np.ndarray, n_splits: int, 
     fig.show()
 
     return fig
+
+def find_nearest(array, value):
+    array = np.asarray(array)
+    idx = (np.abs(array - value)).argmin()
+    return idx
 
 def metrics_on_one_plot(test_array: list, target_array: list) -> go.Figure:
     """
@@ -432,13 +438,22 @@ def metrics_on_one_plot(test_array: list, target_array: list) -> go.Figure:
                    for i in range(means.shape[1])
                    ]
 
+
+    best_queue = find_nearest(means[:, 4], 0.20)
     graphs_vertical = [dict(type="scatter",
                             x=[thresholds[max_indices[3]], thresholds[max_indices[3]]],
                             y=[0,1],
                             name="Best F1 score",
                             mode='lines',
                             line=dict(color=BLUE_GREY[1], width=3, dash='dash')
-                            )
+                            ),
+                       dict(type="scatter",
+                            x=[best_queue, best_queue],
+                            y=[0,1],
+                            name="Optimal queue rate",
+                            mode='lines',
+                            line=dict(color=BROWN[1], width=3, dash='dash')
+                            ),
                        ]
 
     graphs = graphs + graphs_ci + graphs_vertical
@@ -450,6 +465,37 @@ def metrics_on_one_plot(test_array: list, target_array: list) -> go.Figure:
 
     fig.show()
 
+
+def probability_distribution(test_array: list, target_array: list) -> go.Histogram:
+    """
+    _summary_
+
+    Parameters
+    ----------
+    test_array : list
+        _description_
+    target_array : list
+        _description_
+
+    Returns
+    -------
+    go.Histogram
+        _description_
+    """
+    fig = px.histogram(x = target_array, color = test_array,
+                       color_discrete_sequence=[hex_colors[0], hex_colors[-1]], marginal="violin",
+                       nbins=20)
+
+    a = np.vstack((target_array, test_array))
+
+    print(np.std(a[:, test_array==1]), np.mean(a[:, test_array==1]))
+    print(np.std(a[:, test_array==0]), np.mean(a[:, test_array==0]))
+
+    fig.update_layout(title="Probability distribution by class",
+                      xaxis_title="Output probabilities",
+                      yaxis_title="Count")
+    fig.show()
+    return fig
 
 def graphs_cross_val(auc_metrics: dict, n_splits: int= 5):
     """
