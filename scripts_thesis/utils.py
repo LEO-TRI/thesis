@@ -23,6 +23,10 @@ def update_prop(handle, orig):
     x,y = handle.get_data()
     handle.set_data([np.mean(x)]*2, [0, 2*y[0]])
 
+def find_nearest(array, value):
+    array = np.asarray(array)
+    idx = (np.abs(array - value)).argmin()
+    return idx
 
 def table_color(data:pd.Series, palette_min: int=145, palette_up: int=300, n: int=5) -> list:
     """
