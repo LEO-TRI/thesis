@@ -22,6 +22,13 @@ sns.set_theme(context='notebook', style='darkgrid', palette='deep', rc= custom_p
 hex_colors = [mcolors.to_hex(color) for color in sns.diverging_palette(145, 300, s=60, n=5)]
 hex_colors.reverse()
 
+
+#TODO Consider whether all graph function could be moved with a larger Graph class
+#TODO OR create Graph class and combine with Model class to store outputs and be able to call instance method
+#TODO that compute graph from it
+
+#Look into multiple inheritance in this case
+
 def plot_confusion_matrix(test_array: np.ndarray, target_array: np.ndarray, width: int= 600, height: int= 600) -> go.Figure:
     """
     Convenience function to print a confusion matrix with the predicted results y_pred and actual data y_true
@@ -147,7 +154,6 @@ def model_explainer(df: pd.DataFrame, x: str= "coef", y: str= "feature")-> go.Fi
     fig.show()
 
     return fig
-
 
 def model_dl_examiner(train: np.ndarray, val: np.ndarray) -> go.Figure:
     """
@@ -352,10 +358,6 @@ def _prc_curve(test_array: np.ndarray, target_array: np.ndarray, n_splits: int, 
 
     return fig
 
-def find_nearest(array, value):
-    array = np.asarray(array)
-    idx = (np.abs(array - value)).argmin()
-    return idx
 
 def metrics_on_one_plot(test_array: list, target_array: list) -> go.Figure:
     """
@@ -468,33 +470,30 @@ def metrics_on_one_plot(test_array: list, target_array: list) -> go.Figure:
 
 def probability_distribution(test_array: list, target_array: list) -> go.Histogram:
     """
-    _summary_
+    Computes a histogram with the probability distribution of both classes based
+    on the output of a model.
 
     Parameters
     ----------
     test_array : list
-        _description_
+        A list of arrays of y_test values
     target_array : list
-        _description_
+        A list of arrays of y_pred values
 
     Returns
     -------
     go.Histogram
-        _description_
+        A plotly histogram with the distribution of both classes
     """
     fig = px.histogram(x = target_array, color = test_array,
                        color_discrete_sequence=[hex_colors[0], hex_colors[-1]], marginal="violin",
                        nbins=20)
 
-    a = np.vstack((target_array, test_array))
-
-    print(np.std(a[:, test_array==1]), np.mean(a[:, test_array==1]))
-    print(np.std(a[:, test_array==0]), np.mean(a[:, test_array==0]))
-
     fig.update_layout(title="Probability distribution by class",
                       xaxis_title="Output probabilities",
                       yaxis_title="Count")
     fig.show()
+
     return fig
 
 def graphs_cross_val(auc_metrics: dict, n_splits: int= 5):
