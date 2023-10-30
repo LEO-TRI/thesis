@@ -25,7 +25,7 @@ def update_prop(handle, orig):
 
 def find_nearest(array, value):
     array = np.asarray(array)
-    idx = (np.abs(array - value)).argmin()
+    idx = np.argmin(np.abs(array - value))
     return idx
 
 def table_color(data:pd.Series, palette_min: int=145, palette_up: int=300, n: int=5) -> list:
@@ -63,7 +63,6 @@ def table_color(data:pd.Series, palette_min: int=145, palette_up: int=300, n: in
 def line_adder(h_coord=0.5, color="black", linestyle="-", *args):
     line = plt.Line2D([0.15,0.85], [h_coord, h_coord], transform=args.transFigure, color=color, linestyle=linestyle)
     return args.add_artist(line)
-
 
 def custom_combiner(feature, category):
     """
@@ -339,7 +338,20 @@ def is_array_like(obj) -> bool:
         A boolean, True if the object is array_like, False else
     """
 
-    return (type(obj) == np.ndarray) | (type(obj) == list) | (type(obj) == pd.Series)
+    return isinstance(obj, (np.ndarray, list, pd.Series))
+
+def to_array(obj) -> np.ndarray:
+
+    if isinstance(obj, (pd.Series, pd.DataFrame)):
+        result = obj.to_numpy()
+
+    elif isinstance(obj, (list, tuple, np.ndarray)):
+        result = np.array(obj)
+
+    else:
+        raise TypeError("Not array like")
+
+    return result
 
 def queue_rate(y_pred: np.ndarray, threshold: float) -> float:
     """

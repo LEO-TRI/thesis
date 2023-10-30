@@ -10,7 +10,7 @@ from colorama import Fore, Style
 from scripts_thesis.data import DataLoader, LoadDataMixin
 from scripts_thesis.model_ML import train_model, evaluate_model, predict_model, load_model, tune_model
 from scripts_thesis.utils import get_top_features, params_extracter
-from scripts_thesis.graphs import model_explainer, plot_confusion_matrix, graphs_cross_val, probability_distribution
+from scripts_thesis.graphs import model_explainer, plot_confusion_matrix, graphs_cross_val, probability_distribution, feature_importance_plotting
 
 from scripts_thesis.params import *
 from scripts_thesis.preproc import *
@@ -269,7 +269,11 @@ class ModelFlow(LoadDataMixin, DataLoader):
         X = data_processed.drop(columns=[target])
 
         model = load_model(classifier = classifier)
-        #print(model)
+
+        if classifier == "xgb":
+            features = model["classifier"].feature_importances_
+            fig = feature_importance_plotting(features)
+            fig.show()
 
         results, y_pred, y_test = evaluate_model(model, X, y)
         y_test = y_test.to_numpy()

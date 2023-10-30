@@ -3,7 +3,7 @@ from sklearn.experimental import enable_iterative_imputer #Required to import It
 from sklearn.impute import IterativeImputer
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.model_selection import train_test_split, RepeatedStratifiedKFold, RandomizedSearchCV
-from sklearn.metrics import accuracy_score, precision_score, f1_score, recall_score, classification_report, make_scorer, roc_auc_score
+from sklearn.metrics import accuracy_score, precision_score, f1_score, recall_score, classification_report, make_scorer, roc_auc_score, fbeta_score
 from sklearn.feature_selection import SelectKBest, chi2
 
 from sklearn.preprocessing import RobustScaler, OneHotEncoder, FunctionTransformer
@@ -59,7 +59,8 @@ def print_results(y_test: np.ndarray, y_pred: np.ndarray, verbose: bool= True, f
                    precision=np.round(precision_score(y_test, y_pred, zero_division= 0), 2),
                    recall=np.round(recall_score(y_test, y_pred, zero_division= 0), 2),
                    f1=np.round(f1_score(y_test, y_pred, zero_division= 0), 2),
-                   roc_auc=np.round(roc_auc_score(y_test, y_pred), 2)
+                   roc_auc=np.round(roc_auc_score(y_test, y_pred), 2),
+                   fbeta=np.round(fbeta_score(y_test, y_pred, beta=0.5), 2)
                    )
 
 #Add a fold parameter to know from which fold data comes from if cv
@@ -70,8 +71,9 @@ def print_results(y_test: np.ndarray, y_pred: np.ndarray, verbose: bool= True, f
         print(Fore.BLUE + f"Accuracy: {metrics.get('accuracy')}"+ Style.RESET_ALL)
         print(Fore.BLUE + f"Precision: {metrics.get('precision')}"+ Style.RESET_ALL)
         print(Fore.BLUE + f"Recall: {metrics.get('recall')}"+ Style.RESET_ALL)
-        print(Fore.BLUE + f"F1 Score: {metrics.get('f1')}"+ Style.RESET_ALL)
+        print(Fore.BLUE + f"Fbeta Score: {metrics.get('fbeta')}"+ Style.RESET_ALL)
         print(Fore.BLUE + f"ROC_AUC Score: {metrics.get('roc_auc')}"+ Style.RESET_ALL)
+
 
     return metrics
 
@@ -196,9 +198,8 @@ def build_pipeline(numeric_cols: list[str],
                         )
 
     if is_rebalance:
-        pipeline.steps.append(("balancing", RandomUnderSampler(random_state=1830)),
-                              ('smote', SMOTE(random_state=1830, k_neighbors=20))
-                              )
+        pipeline.steps.append(("balancing", RandomUnderSampler(random_state=1830)))
+        pipeline.steps.append(('smote', SMOTE(random_state=1830, k_neighbors=20)))
 
     #Set the "head" of the pipeline from the potential classifiers
     classifiers = dict(logistic= LogisticRegression(penalty='l2', C=0.9, random_state=1830, solver='liblinear', max_iter=1000, class_weight="balanced"),
@@ -277,7 +278,8 @@ def tune_model(X: pd.DataFrame, y: pd.Series,
 
     scoring = dict(AUC="roc_auc",
                    accuracy=make_scorer(accuracy_score),
-                   precision=make_scorer(precision_score)
+                   precision=make_scorer(precision_score),
+                   fbeta=make_scorer(fbeta_score, beta=0.5)
                    )
 
     rand_search = RandomizedSearchCV(pipe_model,
@@ -285,7 +287,7 @@ def tune_model(X: pd.DataFrame, y: pd.Series,
                                      cv=cv,
                                      n_iter=n_iter,
                                      scoring=scoring,
-                                     refit="precision",
+                                     refit="fbeta",
                                      random_state=1830,
                                      verbose=2)
 
@@ -361,8 +363,6 @@ def train_model(X: pd.DataFrame,
 
     #Filters for models that cannot produce probabilities estimates
     has_proba = True
-    if (classifier == "sgd"):# | (classifier == "xgb"):
-        has_proba = False
 
     for fold, (train, test) in enumerate(cv.split(X, y)):
         start_time = time.time()  # Record the start time
