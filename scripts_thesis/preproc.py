@@ -170,8 +170,8 @@ def clean_variables_features(df: pd.DataFrame, reviews: pd.DataFrame, features: 
         df = df.loc[mask,:].reset_index(drop=True)
 
     df = df.set_index("id")
-    reviews = reviews.set_index("listing_id")[["comments"]]
-    df = df.join(reviews, how="left")
+    #reviews = reviews.set_index("listing_id")[["comments"]]
+    #df = df.join(reviews, how="left")
 
     df["host_identity_verified"] = np.where(df["host_identity_verified"]=="t", 1, 0)
     df["host_is_superhost"] = np.where(df["host_is_superhost"]=="t", 1, 0)
@@ -198,8 +198,8 @@ def clean_variables_features(df: pd.DataFrame, reviews: pd.DataFrame, features: 
     df["host_about"] = cd.clean_vec(df["host_about"].values)
     df["host_about"] = sc.preprocess_spacy(df["host_about"].values)
 
-    df["comments"] = cd.clean_vec(df["comments"].values)
-    df["comments"] = sc.preprocess_spacy(df["comments"].values)
+    #df["comments"] = cd.clean_vec(df["comments"].values)
+    #df["comments"] = sc.preprocess_spacy(df["comments"].values)
 
     if features is None:
         features = ["host_is_superhost", "host_identity_verified",
@@ -208,7 +208,7 @@ def clean_variables_features(df: pd.DataFrame, reviews: pd.DataFrame, features: 
             "reviews_per_month", "neighbourhood_cleansed",
             "host_listings_count", "description", "has_host_about",
             "host_about", "word_count", "upper_char_count", "special_char_count",
-            "time_difference", "occupancy_rate_cons", "comments"]
+            "time_difference", "occupancy_rate_cons"] #, "comments"]
 
     df = df.loc[:, features]
 

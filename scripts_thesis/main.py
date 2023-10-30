@@ -96,7 +96,7 @@ class ModelFlow(LoadDataMixin, DataLoader):
 
         # Process data
         df = self.load_raw_data() #Brings back load_raw_data. Used as a test for mixin
-        reviews = self.load_raw_data(target="reviews")
+        #reviews = self.load_raw_data(target="reviews")
 
         data_clean = preprocess_data(df)
         #data_clean = data_clean.sample(frac=0.1)
@@ -105,7 +105,7 @@ class ModelFlow(LoadDataMixin, DataLoader):
 
         if has_model:
             data_clean = clean_target_feature(data_clean)
-            data_clean = clean_variables_features(data_clean, reviews)
+            data_clean = clean_variables_features(data_clean) #, reviews)
 
         data_clean_pred = data_clean.sample(n=10, random_state=1830, replace=False)
         data_clean_train = data_clean.drop(index=data_clean_pred.index)
@@ -219,7 +219,7 @@ class ModelFlow(LoadDataMixin, DataLoader):
 
         model, results, auc_metrics = train_model(X_train, y_train, classifier=classifier, n_splits=n_splits, is_rebalance=is_rebalance) #auc_metrics = {test_list, proba_list}
         fig1, fig2, best_threshold = graphs_cross_val(auc_metrics) #Producing the cross_val metrics
-        self.best_threshold.update({classifier : best_threshold})
+        self.best_threshold[classifier] = best_threshold
 
         print(Fore.MAGENTA + "\n ✅ Training finished, saving model and graph..." + Style.RESET_ALL)
 
@@ -267,18 +267,7 @@ class ModelFlow(LoadDataMixin, DataLoader):
 
         #TODO Understand filename not working. file_name = class(MlFlow) instead of none
 
-        if self.test_data is None: 
-            data_processed = DataLoader.load_processed_data(file_name=self.file_name)
-        
-            if data_processed is None:
-                return None
-
-            y= data_processed[target]
-            X = data_processed.drop(columns=[target])
-            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=self.test_size, random_state=1830, stratify=y)
-        
-        else:
-            X_test, y_test = self.test_data
+        X_test, y_test = self.test_data
 
         model = load_model(classifier = classifier)
         best_threshold = self.best_threshold.get(classifier)

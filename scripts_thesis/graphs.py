@@ -510,7 +510,7 @@ def probability_distribution(test_array: list, target_array: list) -> go.Histogr
     """
     fig = px.histogram(x = target_array, color = test_array,
                        color_discrete_sequence=[hex_colors[0], hex_colors[-1]], marginal="violin",
-                       nbins=20)
+                       nbins=40)
 
     fig.update_layout(title="Probability distribution by class",
                       xaxis_title="Output probabilities",
