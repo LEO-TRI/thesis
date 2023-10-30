@@ -98,7 +98,7 @@ def baseline_model(y: np.ndarray, test_split: float=0.3) -> np.ndarray:
     """
 
     print(Fore.BLUE + "\n ⭐️ Results to beat" + Style.RESET_ALL)
-    y_train, y_test = train_test_split(y, test_size=test_split, random_state=42, stratify=y)
+    y_train, y_test = train_test_split(y, test_size=test_split, random_state=1830, stratify=y)
 
     print(Fore.BLUE + "\n Result for random baseline" + Style.RESET_ALL)
     y_random = np.random.randint(0, 2, size=len(y_test))
@@ -242,7 +242,8 @@ def build_pipeline(numeric_cols: list[str],
 
     return pipeline
 
-def tune_model(X: pd.DataFrame, y: pd.Series,
+def tune_model(X_train: pd.DataFrame, 
+               y_train: pd.Series,
                max_features: int=1000, n_iter: int=20, cv: int=5, classifier: str='logistic') -> Pipeline:
     """
     Tune a machine learning model with hyperparameter optimization.
@@ -268,9 +269,10 @@ def tune_model(X: pd.DataFrame, y: pd.Series,
         A scikit-learn pipeline containing a tuned machine learning model.
     """
 
-    numeric_cols = X.select_dtypes(include=[np.number]).columns
+    numeric_cols = X_train.select_dtypes(include=[np.number]).columns
     text_cols = ["amenities", "description", "host_about"]
-    other_cols = list(set(X.columns) - set(numeric_cols) - set(text_cols))
+    other_cols = list(set(X_train.columns) - set(numeric_cols) - set(text_cols))
+
 
     pipe_model = build_pipeline(numeric_cols, text_cols, other_cols, max_features_tfidf = max_features, classifier=classifier)
 
@@ -290,8 +292,8 @@ def tune_model(X: pd.DataFrame, y: pd.Series,
                                      refit="fbeta",
                                      random_state=1830,
                                      verbose=2)
-
-    rand_search.fit(X, y)
+    
+    rand_search.fit(X_train, y_train)
 
     print(Fore.BLUE + f"Precision for {classifier} is : {np.round(rand_search.best_score_, 2)}\n" + Style.RESET_ALL )
 
@@ -300,9 +302,9 @@ def tune_model(X: pd.DataFrame, y: pd.Series,
 
 def train_model(X: pd.DataFrame,
                 y: pd.Series,
-                test_split: float=0.3,
                 max_features: int=1000,
-                n_splits: int= 5,
+                n_splits: int=5,
+                n_repeats: int=2,
                 classifier: str='logistic',
                 is_rebalance: bool=False) -> Pipeline:
     """
@@ -355,7 +357,8 @@ def train_model(X: pd.DataFrame,
 
     print(Fore.BLUE + "\nLaunching CV" + Style.RESET_ALL)
 
-    cv = RepeatedStratifiedKFold(n_splits=n_splits, n_repeats=2, random_state=42)
+
+    cv = RepeatedStratifiedKFold(n_splits=n_splits, n_repeats=n_repeats, random_state=42)
 
     res = []
     pred_list = []
@@ -364,21 +367,24 @@ def train_model(X: pd.DataFrame,
     #Filters for models that cannot produce probabilities estimates
     has_proba = True
 
-    for fold, (train, test) in enumerate(cv.split(X, y)):
+    #X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_split, random_state=1830, stratify=y)
+    X_train = X.reset_index(drop=True)
+    y_train = y.reset_index(drop=True)
+
+    for fold, (train, test) in enumerate(cv.split(X_train, y_train)):
         start_time = time.time()  # Record the start time
 
-        pipe_model.fit(X.iloc[train,:], y[train])
-        y_pred = pipe_model.predict(X.iloc[test,:])
-        res.append(print_results(y[test], y_pred, verbose=False, fold=fold))
+        pipe_model.fit(X_train.iloc[train,:], y_train[train])
+        y_pred = pipe_model.predict(X_train.iloc[test,:])
+        res.append(print_results(y_train[test], y_pred, verbose=False, fold=fold))
 
-        test_list.append(y[test])
+        test_list.append(y_train[test])
 
         if has_proba:
-            y_proba = pipe_model.predict_proba(X.loc[test,:])
+            y_proba = pipe_model.predict_proba(X_train.loc[test,:])
             pred_list.append(y_proba[:,1])
         else :
             pred_list.append(y_pred)
-
 
         end_time = time.time()  # Record the end time
         elapsed_time = end_time - start_time  # Calculate elapsed time
@@ -387,7 +393,6 @@ def train_model(X: pd.DataFrame,
 
     res = pd.DataFrame(res)
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_split, random_state=1830, stratify=y)
     pipe_model.fit(X_train, y_train)
 
     #size_data = y_train.value_counts().sort_values(ascending=False).iloc[0] * 16
@@ -397,7 +402,7 @@ def train_model(X: pd.DataFrame,
 
     return pipe_model, res, dict(test_array=test_list, target_array=pred_list)
 
-def evaluate_model(model, X: pd.DataFrame, y: pd.Series, test_split:float=0.3) -> pd.DataFrame:
+def evaluate_model(model, X: pd.DataFrame, y: pd.Series, threshold: float) -> pd.DataFrame:
     """
     Evaluate trained model performance on the dataset
 
@@ -422,7 +427,7 @@ def evaluate_model(model, X: pd.DataFrame, y: pd.Series, test_split:float=0.3) -
         A np.array of the real data
     """
 
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_split, random_state=42, stratify=y)
+    X_test, y_test = X, y
 
     print(Fore.BLUE + f"\nEvaluating model on {len(X_test)} rows..." + Style.RESET_ALL)
 
@@ -430,17 +435,20 @@ def evaluate_model(model, X: pd.DataFrame, y: pd.Series, test_split:float=0.3) -
         print(f"\n❌ No model to evaluate")
         return None
 
-    y_pred = model.predict(X_test)
+    y_pred_proba = model.predict_proba(X_test)[:,1]
+    y_pred = np.where(y_pred_proba>=threshold, 1, 0)
 
-    metrics = [accuracy_score(y_test, y_pred) , precision_score(y_test, y_pred, average="macro"),
-               f1_score(y_test, y_pred, average="macro"), recall_score(y_test, y_pred, average="macro")]
+    metrics = [accuracy_score(y_test, y_pred), 
+               precision_score(y_test, y_pred),
+               fbeta_score(y_test, y_pred, beta=0.5), 
+               recall_score(y_test, y_pred, average="macro")]
 
-    metrics_name = ["res_accuracy", "res_precision", "res_f1", "res_recall"]
+    metrics_name = ["res_accuracy", "res_precision", "res_fbeta", "res_recall"]
 
     print(f"✅ Model evaluated")
     print_results(y_test, y_pred)
 
-    print(f"✅ Model evaluated, accuracy: {np.round(metrics[0], 2)}, precision: {np.round(metrics[1], 2)}, recall: {np.round(metrics[2], 2)}")
+    #print(f"✅ Model evaluated, accuracy: {np.round(metrics[0], 2)}, precision: {np.round(metrics[1], 2)}, recall: {np.round(metrics[2], 2)}")
 
     print(f"✅ Full Classification Report")
     print(classification_report(y_test, y_pred, zero_division = 0))
@@ -448,9 +456,8 @@ def evaluate_model(model, X: pd.DataFrame, y: pd.Series, test_split:float=0.3) -
     results = dict(zip(metrics_name, metrics))
     results = {key: [value] for key, value in results.items()}
 
-    y_pred = model.predict_proba(X_test)[:,1]
 
-    return pd.DataFrame(results, index=[0]), y_pred, y_test
+    return pd.DataFrame(results, index=[0]), y_pred_proba, y_test
 
 
 def predict_model(model: Pipeline, X: pd.DataFrame) -> np.ndarray:

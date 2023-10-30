@@ -29,7 +29,7 @@ hex_colors.reverse()
 
 #Look into multiple inheritance in this case
 
-def plot_confusion_matrix(test_array: np.ndarray, target_array: np.ndarray, width: int= 600, height: int= 600) -> go.Figure:
+def plot_confusion_matrix(test_array: np.ndarray, target_array: np.ndarray, threshold: float=0.5, width: int= 600, height: int= 600) -> go.Figure:
     """
     Convenience function to print a confusion matrix with the predicted results y_pred and actual data y_true
 
@@ -58,9 +58,8 @@ def plot_confusion_matrix(test_array: np.ndarray, target_array: np.ndarray, widt
         test_array = np.concatenate(test_array)
         target_array = np.concatenate(target_array)
 
-
     if set(target_array) != set([0, 1]):
-        target_array = np.where(target_array>=0.5, 1, 0)
+        target_array = np.where(target_array>=threshold, 1, 0)
 
     labels = sorted(list(set(test_array)))
 
@@ -71,7 +70,7 @@ def plot_confusion_matrix(test_array: np.ndarray, target_array: np.ndarray, widt
     )
 
     #Get results as proportion of total results
-    df_lambda = df_lambda/len(test_array)
+    df_lambda = df_lambda.div(np.sum(df_lambda, axis=1), axis=0) *100
     df_lambda = df_lambda.apply(lambda value : np.round(value, 2))
 
     acc = accuracy_score(test_array, target_array)
@@ -86,7 +85,7 @@ def plot_confusion_matrix(test_array: np.ndarray, target_array: np.ndarray, widt
                    x=[str(col) for col in df_lambda.columns],
                    y=[str(col) for col in df_lambda.columns],
                    colorscale='RdBu_r',
-                   text=df_lambda.values * 100,
+                   text=df_lambda.values,
                    texttemplate="%{text}%",
                    textfont={"size":16},
                    colorbar=dict(title='Proportion'),
@@ -467,6 +466,8 @@ def metrics_on_one_plot(test_array: list, target_array: list) -> go.Figure:
 
     fig.show()
 
+    return thresholds[max_indices[3]]
+
 def feature_importance_plotting(features: np.ndarray) -> go.Scatter:
     """
     _summary_
@@ -540,10 +541,10 @@ def graphs_cross_val(auc_metrics: dict, n_splits: int= 5):
     sample_length = len(auc_metrics.get("test_array"))
     sample = np.random.choice(sample_length, int(sample_length/2), replace=False)
 
+    plot_confusion_matrix(**auc_metrics)
     #p.array(v)[[sample], :].reshape(len(sample), len(v[0])
     auc_metrics = {k : [list(val) for i, val in enumerate(v) if i in sample] for k, v in auc_metrics.items()}
 
-    plot_confusion_matrix(**auc_metrics)
-    metrics_on_one_plot(**auc_metrics)
+    best_threshold = metrics_on_one_plot(**auc_metrics)
 
-    return (_auc_curve(**auc_metrics, n_splits=n_splits), _prc_curve(**auc_metrics, n_splits=n_splits))
+    return (_auc_curve(**auc_metrics, n_splits=n_splits), _prc_curve(**auc_metrics, n_splits=n_splits), best_threshold)
