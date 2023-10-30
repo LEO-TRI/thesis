@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import seaborn as sns
 
-from sklearn.metrics import accuracy_score, f1_score, recall_score, precision_score, confusion_matrix, auc
+from sklearn.metrics import accuracy_score, f1_score, recall_score, precision_score, confusion_matrix, auc, fbeta_score
 
 from scripts_thesis.utils import *
 from scripts_thesis.charter import *
@@ -75,7 +75,7 @@ def plot_confusion_matrix(test_array: np.ndarray, target_array: np.ndarray, widt
     df_lambda = df_lambda.apply(lambda value : np.round(value, 2))
 
     acc = accuracy_score(test_array, target_array)
-    f1s = f1_score(test_array, target_array)
+    fbetas = fbeta_score(test_array, target_array, beta=0.5)
     precision = precision_score(test_array, target_array)
     recall = recall_score(test_array, target_array)
 
@@ -93,8 +93,9 @@ def plot_confusion_matrix(test_array: np.ndarray, target_array: np.ndarray, widt
                    hoverongaps = False)
                    )
 
+    title = f'Confusion Matrix : Overall results <br><sup>Accuracy: {acc:.2f}, FBeta: {fbetas:.2f}, Precision: {precision:.2f}, Recall: {recall:.2f}</sup>'
     fig.update_layout(#<br> is a line break, and <sup> is superscript
-        title=f'Confusion Matrix : Overall results <br><sup>Accuracy: {acc:.2f}, F1: {f1s:.2f}, Precision: {precision:.2f}, Recall: {recall:.2f}</sup>',
+        title=title,
         xaxis=dict(title='Predicted'),
         yaxis=dict(title='Actual'),
         width=width,
@@ -389,7 +390,7 @@ def metrics_on_one_plot(test_array: list, target_array: list) -> go.Figure:
 
     thresholds = np.linspace(0, 1, 500)
 
-    metrics = ["accuracy", "precision", "recall", "f1", "queue_rate"]
+    metrics = ["accuracy", "precision", "recall", "fbeta", "queue_rate"]
     names = dict(zip(np.arange(len(metrics)), metrics))
 
     #3D array with axis 0 being thresholds, axis 1 being metrics and axis 2 being folds
@@ -403,7 +404,7 @@ def metrics_on_one_plot(test_array: list, target_array: list) -> go.Figure:
             results[i,:,fold] = [accuracy_score(y_test, y_pred),
                                 precision_score(y_test, y_pred, zero_division=1),
                                 recall_score(y_test, y_pred, zero_division=0),
-                                f1_score(y_test, y_pred),
+                                fbeta_score(y_test, y_pred, beta=0.5),
                                 queue_rate(y_pred, threshold)
                                 ]
 
@@ -413,7 +414,6 @@ def metrics_on_one_plot(test_array: list, target_array: list) -> go.Figure:
     means_plus = means + 1.96 * stds/np.sqrt(results.shape[2])
     means_minus = means - 1.96 * stds/np.sqrt(results.shape[2])
 
-    max_indices = np.argmax(means, axis=0, keepdims=False)
 
     #Add metrics lines
     graphs = [dict(type="scatter",
@@ -440,17 +440,17 @@ def metrics_on_one_plot(test_array: list, target_array: list) -> go.Figure:
                    for i in range(means.shape[1])
                    ]
 
-
+    max_indices = np.argmax(means, axis=0, keepdims=False)
     best_queue = find_nearest(means[:, 4], 0.20)
     graphs_vertical = [dict(type="scatter",
                             x=[thresholds[max_indices[3]], thresholds[max_indices[3]]],
                             y=[0,1],
-                            name="Best F1 score",
+                            name="Best FBeta score",
                             mode='lines',
                             line=dict(color=BLUE_GREY[1], width=3, dash='dash')
                             ),
                        dict(type="scatter",
-                            x=[best_queue, best_queue],
+                            x=[thresholds[best_queue], thresholds[best_queue]],
                             y=[0,1],
                             name="Optimal queue rate",
                             mode='lines',
@@ -466,6 +466,28 @@ def metrics_on_one_plot(test_array: list, target_array: list) -> go.Figure:
     fig = go.Figure(data=graphs, layout=layout)
 
     fig.show()
+
+def feature_importance_plotting(features: np.ndarray) -> go.Scatter:
+    """
+    _summary_
+
+    Parameters
+    ----------
+    features : np.ndarray
+        _description_
+
+    Returns
+    -------
+    go.Scatter
+        _description_
+    """
+
+    index = np.ones(len(features))
+    fig =  px.scatter(y=index, x=features, color_discrete_sequence=hex_colors)
+    fig.update_layout(title="Feature importance Plot",
+                      xaxis_title="Feature Importance",
+                      yaxis_title="")
+    return fig
 
 
 def probability_distribution(test_array: list, target_array: list) -> go.Histogram:
