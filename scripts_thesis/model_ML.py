@@ -12,7 +12,7 @@ from sklearn.compose import ColumnTransformer
 
 from sklearn.naive_bayes import GaussianNB
 from sklearn.ensemble import HistGradientBoostingClassifier , RandomForestClassifier, StackingClassifier
-from sklearn.linear_model import LogisticRegression, SGDClassifier
+from sklearn.linear_model import LogisticRegression
 
 #from imblearn.pipeline import Pipeline
 from imblearn.over_sampling import SMOTE
@@ -27,7 +27,7 @@ import time
 import os
 import pickle
 
-from scripts_thesis.utils import params_combiner, sparse_to_dense, neg_to_pos
+from scripts_thesis import utils 
 from scripts_thesis.params import *
 
 from colorama import Fore, Style
@@ -205,7 +205,6 @@ def build_pipeline(numeric_cols: list[str],
     classifiers = dict(logistic= LogisticRegression(penalty='l2', C=0.9, random_state=1830, solver='liblinear', max_iter=1000, class_weight="balanced"),
                        gbt= HistGradientBoostingClassifier(random_state=1830),
                        random_forest= RandomForestClassifier(random_state=1830, class_weight="balanced"),
-                       sgd= SGDClassifier(random_state=1830, max_iter=1000),
                        xgb=xgb.XGBClassifier(random_state=1830, tree_method="hist"),
                        gNB = GaussianNB()
                        )
@@ -228,7 +227,7 @@ def build_pipeline(numeric_cols: list[str],
 
     #Adding an additional step for classifiers that require dense array
     if (classifier == "gbt") | (classifier == 'stacked') | (classifier == "gNB") | (classifier == "xgb"):
-        sparse_to_dense_transformer = FunctionTransformer(func=sparse_to_dense, validate=False)
+        sparse_to_dense_transformer = FunctionTransformer(func=utils.sparse_to_dense, validate=False)
         pipeline.steps.append(['dense', sparse_to_dense_transformer])
 
     #Reducing dimensionality for the xgb model
@@ -276,7 +275,7 @@ def tune_model(X_train: pd.DataFrame,
 
     pipe_model = build_pipeline(numeric_cols, text_cols, other_cols, max_features_tfidf = max_features, classifier=classifier)
 
-    pipe_params = params_combiner(classifier=classifier)
+    pipe_params = utils.params_combiner(classifier=classifier)
 
     scoring = dict(AUC="roc_auc",
                    accuracy=make_scorer(accuracy_score),

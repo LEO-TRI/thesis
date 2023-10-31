@@ -10,7 +10,7 @@ from colorama import Fore, Style
 from scripts_thesis.data import DataLoader, LoadDataMixin
 from scripts_thesis.model_ML import train_model, evaluate_model, predict_model, load_model, tune_model
 from scripts_thesis.utils import get_top_features, params_extracter
-from scripts_thesis.graphs import model_explainer, plot_confusion_matrix, graphs_cross_val, probability_distribution, feature_importance_plotting, metrics_on_one_plot
+from scripts_thesis.graphs import model_explainer, plot_confusion_matrix, graphs_cross_val, probability_distribution, feature_importance_plotting
 
 from scripts_thesis.params import *
 from scripts_thesis.preproc import *
@@ -64,6 +64,7 @@ class ModelFlow(LoadDataMixin, DataLoader):
         self.best_threshold = dict()
         self.test_data = None
         self.test_size=0.3
+        self.load_model = load_model
 
         X, y = self.prep_data(file_name=file_name, target=target)
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_split, random_state=1830, stratify=y)
@@ -244,7 +245,7 @@ class ModelFlow(LoadDataMixin, DataLoader):
         print(Fore.MAGENTA + "\nSaving done..." + Style.RESET_ALL)
         print(Fore.MAGENTA + "\n  ✅ Training accomplished, well done Captain..." + Style.RESET_ALL)
 
-    def evaluate(self, file_name: str = None, target: str = "license", classifier: str="logistic") -> pd.DataFrame:
+    def evaluate(self, file_name: str = None, classifier: str="logistic") -> pd.DataFrame:
         """
         Evaluate the performance of the latest production model on processed data.\n
 
@@ -269,7 +270,7 @@ class ModelFlow(LoadDataMixin, DataLoader):
 
         X_test, y_test = self.test_data
 
-        model = load_model(classifier = classifier)
+        model = self.load_model(classifier = classifier)
         best_threshold = self.best_threshold.get(classifier)
 
         if classifier == "xgb":

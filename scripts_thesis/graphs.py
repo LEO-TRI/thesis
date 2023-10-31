@@ -519,14 +519,14 @@ def probability_distribution(test_array: list, target_array: list) -> go.Histogr
 
     return fig
 
-def graphs_cross_val(auc_metrics: dict, n_splits: int= 5):
+def graphs_cross_val(auc_metrics: dict, n_splits: int=5):
     """
     Centralises the calls for the various graph functions in one place
 
     Parameters
     ----------
     auc_metrics : dict
-        A dictionnary containing lists of lists for respectively y_test, y_pred or y_proba by cv fold
+        A dictionnary containing lists of lists for respectively y_test, y_proba by cv fold
     n_splits : int, optional
         Number of folds by cv, by default 5
 
@@ -542,9 +542,12 @@ def graphs_cross_val(auc_metrics: dict, n_splits: int= 5):
     sample = np.random.choice(sample_length, int(sample_length/2), replace=False)
 
     plot_confusion_matrix(**auc_metrics)
-    #p.array(v)[[sample], :].reshape(len(sample), len(v[0])
-    auc_metrics = {k : [list(val) for i, val in enumerate(v) if i in sample] for k, v in auc_metrics.items()}
 
+
+    auc_metrics = {k : [list(val) for i, val in enumerate(v) if i in sample] for k, v in auc_metrics.items()}
     best_threshold = metrics_on_one_plot(**auc_metrics)
 
     return (_auc_curve(**auc_metrics, n_splits=n_splits), _prc_curve(**auc_metrics, n_splits=n_splits), best_threshold)
+
+class FigureFactory():
+    pass

@@ -1,35 +1,43 @@
+import numpy as np
 from math import radians
 from scipy.spatial import KDTree
-from scripts_thesis.utils import to_array, is_array_like
+from sklearn.neighbors import BallTree
 
-class CoordinateCounter:
-    def __init__(self, latitude, longitude):
+from scripts_thesis.utils import to_array
+
+class CoordinateCounterTree:
+    def __init__(self, data_coordinates : list, ball_tree: BallTree):
         # Initialize the class with geographical coordinates
-        self.latitude = radians(latitude)
-        self.longitude = radians(longitude)
-        self.data_points = []
-        self.kd_tree = None
+        self.data_coordinates = data_coordinates
+        self.ball_tree = ball_tree
 
-    def add_data_point(self, latitude, longitude):
-
-        if isinstance(latitude, float) & isinstance(longitude, float):
-            self.data_points.append((radians(latitude), radians(longitude)))
-            self.kd_tree = KDTree(self.data_points)
-        elif is_array_like(latitude) & is_array_like(longitude):
-            latitude, longitude = to_array(latitude), to_array(longitude)
-            for lat, lon in zip(latitude, longitude):
-                self.data_points.append((radians(lat), radians(lon)))
-                self.kd_tree = KDTree(self.data_points)
+    
+    @classmethod
+    def from_data_points(self, latitude: list, longitude: list) -> "CoordinateCounterTree":
 
 
-    def calculate_points_within_distance(self, distance_km):
+
+        data_coordinates = np.concatenate([to_array(latitude), to_array(longitude)], axis=1)
+        data_coordinates = np.radians(data_coordinates)
+
+        #returns a list of tuples (lat, lon)
+        #data_coordinates = list(map(tuple, data_coordinates)) 
+        
+        ball_tree = BallTree(data_coordinates, metric="haversine")
+
+        return CoordinateCounterTree(data_coordinates, ball_tree)
+
+
+    def calculate_points_within_distance(self, point_coordinates: np.array, distance_km: float=1.0):
+        
         # Calculate the number of data points within a given distance (in kilometers) efficiently
-        if self.kd_tree is None:
-            pass
-
-        # Convert distance to radians
         distance_radians = distance_km / 6371.0
 
         # Query the KD-Tree for points within the given distance
-        count = len(self.kd_tree.query_ball_point([self.latitude, self.longitude], distance_radians))
+
+        
+        count = self.ball_tree.query_radius(np.radians(point_coordinates), r = distance_radians, count_only=True)
+
         return count
+
+#
