@@ -204,20 +204,15 @@ def params_combiner(classifier: str="logistic", params_clf: dict= None) -> dict:
                           classifier__max_features=["log2", "sqrt"],
                           )
 
-    elif classifier == "sgd":
-        params_clf = dict(classifier__penalty=["l1", "l2"],
-                          classifier__alpha=stats.uniform(loc=0, scale=1),
-                          classifier__learning_rate=["constant", "optimal"],
-                          classifier__loss=["hinge", "squared_hinge", "perceptron"]
-        )
-
     elif classifier == "xgb":
         params_clf = dict(classifier__n_estimators=np.arange(10, 51, 5),
-                          classifier__max_depth=np.arange(1, 5),
-                          #classifier__grow_policy=['depthwise', 'lossguide'],
+                          classifier__max_depth=np.arange(1, 10),
+                          classifier__max_delta_step=np.arange(1, 10),
                           classifier__learning_rate=stats.uniform(loc=0, scale=1),
-                          classifier__booster =["gbtree", "gblinear", "dart"],
-                          classifier__reg_alpha=stats.uniform(loc=0, scale=1)
+                          classifier__booster =["gbtree", "dart"],
+                          classifier__reg_alpha=stats.uniform(loc=0, scale=1),
+                          classifier__max_bin =np.arange(10, 256, 10),
+                          classifier__num_parallel_tree = np.arange(1, 5)
                           )
 
     elif classifier == "stacked":

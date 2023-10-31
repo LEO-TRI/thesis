@@ -15,6 +15,8 @@ from scripts_thesis.graphs import model_explainer, plot_confusion_matrix, graphs
 from scripts_thesis.params import *
 from scripts_thesis.preproc import *
 
+from sklearn.model_selection import train_test_split
+
 import tensorflow as tf
 
 #####LAUNCH#####
@@ -56,10 +58,19 @@ class ModelFlow(LoadDataMixin, DataLoader):
     Inherits the loading functions from DataLoader thanks to the mixin LoadDataMixin
     """
 
-    def __init__(self) -> None:
+    def __init__(self, file_name = None, target = "license", test_split=0.3) -> None:
         super().__init__() #Brings back load_raw_data. Used as a test for mixin
         self.file_name = None
+        self.best_threshold = dict()
+        self.test_data = None
+        self.test_size=0.3
+        self.load_model = load_model
 
+        X, y = self.prep_data(file_name=file_name, target=target)
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_split, random_state=1830, stratify=y)
+        self.test_data = (X_test, y_test)
+        self.train_data = (X_train, y_train)
+        
 
     def preprocess(self, has_model: bool=True) -> pd.DataFrame:
         """
@@ -86,7 +97,7 @@ class ModelFlow(LoadDataMixin, DataLoader):
 
         # Process data
         df = self.load_raw_data() #Brings back load_raw_data. Used as a test for mixin
-        reviews = self.load_raw_data(target="reviews")
+        #reviews = self.load_raw_data(target="reviews")
 
         data_clean = preprocess_data(df)
         #data_clean = data_clean.sample(frac=0.1)
@@ -95,9 +106,7 @@ class ModelFlow(LoadDataMixin, DataLoader):
 
         if has_model:
             data_clean = clean_target_feature(data_clean)
-            data_clean = clean_variables_features(data_clean, reviews)
-
-        breakpoint()
+            data_clean = clean_variables_features(data_clean) #, reviews)
 
         data_clean_pred = data_clean.sample(n=10, random_state=1830, replace=False)
         data_clean_train = data_clean.drop(index=data_clean_pred.index)
@@ -115,7 +124,10 @@ class ModelFlow(LoadDataMixin, DataLoader):
         return data_clean_pred
 
     #####MODEL#####
-    def optimise(self, file_name: str = None, target: str = "license", classifier: list[str]=None, n_iter: int=50):
+    def optimise(self, 
+                 file_name: str = None, 
+                 classifier: list[str]=None, 
+                 n_iter: int=50):
         """
         A method to perform hyperparameters tuning on several classifiers
 
@@ -125,8 +137,6 @@ class ModelFlow(LoadDataMixin, DataLoader):
         ----------
         file_name : str, optional
             The file from which to pull the processed data, if None returns the latest file, by default None
-        target : str, optional
-            The name of the column to use as feature, by default "license"
         classifiers : list[str], optional
             The classifier to use ('logistic', 'gbt', 'random_forest'), if None will test all, by default None
             Must be passed as a list even if only one classifier is passed.
@@ -140,20 +150,19 @@ class ModelFlow(LoadDataMixin, DataLoader):
         print(Fore.MAGENTA + "\n⭐️ Use case: optimise" + Style.RESET_ALL)
         print(Fore.MAGENTA + "\nLoading preprocessed validation data..." + Style.RESET_ALL)
 
-        X, y = self.prep_data(file_name=file_name, target=target)
-        if X is None: #Used to exit the function and trigger an error if load_processed_data fails
+        X_train, y_train = self.train_data
+        if X_train is None: #Used to exit the function and trigger an error if load_processed_data fails
             return None
 
+        if classifier is None:
+            classifier=["logistic", "gbt", "random_forest", "sgd", "gNB", "xgb", "stacked"]
 
-        if classifiers is None:
-            classifiers=["logistic", "gbt", "random_forest", "sgd", "gNB", "xgb", "stacked"]
+        if type(classifier)==str: #Converts to list format for iteration
+            classifier = [classifier]
 
-        if type(classifiers)==str: #Converts to list format for iteration
-            classifiers = [classifiers]
+        print(Fore.MAGENTA + f"\nTuning {len(classifier)} model(s)..." + Style.RESET_ALL)
 
-        print(Fore.MAGENTA + f"\nTuning {len(classifiers)} model(s)..." + Style.RESET_ALL)
-
-        tuned_results = {key: tune_model(X, y, n_iter=n_iter, classifier=key) for key in classifiers} #Test the pipeline with hyperparameters for three potential classifiers
+        tuned_results = {key: tune_model(X_train, y_train, n_iter=n_iter, classifier=key) for key in classifier} #Test the pipeline with hyperparameters for three potential classifiers
         tuned_results = {key: [model.best_params_, params_extracter(model), model] for key, model in tuned_results.items()} #Extract the best results, and parameters from the fitted pipelines
         tuned_results = {key: value for key, value in sorted(tuned_results.items(), key= lambda x : x[1][1].get("precision"), reverse=True)}
 
@@ -177,9 +186,8 @@ class ModelFlow(LoadDataMixin, DataLoader):
         return tuned_results.get(best_model_ind) #Return the best model
 
 
-    def train(self, file_name: str = None,
-              target: str = "license",
-              test_split: float = 0.3,
+    def train(self, 
+              file_name: str = None,
               n_splits: int=5,
               classifier: str="logistic",
               is_rebalance: bool=False,
@@ -204,16 +212,15 @@ class ModelFlow(LoadDataMixin, DataLoader):
         """
 
         print(Fore.MAGENTA + "\n⭐️ Use case: train" + Style.RESET_ALL)
+        
         print(Fore.MAGENTA + "\nLoading preprocessed validation data..." + Style.RESET_ALL)
-
-        X, y = self.prep_data(file_name=file_name, target=target)
-        if X is None: #Used to exit the function and trigger an error if load_processed_data fails
-            return None
+        X_train, y_train = self.train_data
 
         print(Fore.MAGENTA + "\nTraining model..." + Style.RESET_ALL)
 
-        model, results, auc_metrics = train_model(X, y, test_split, classifier=classifier, n_splits=n_splits, is_rebalance=is_rebalance) #auc_metrics = {test_list, proba_list}
-        fig1, fig2 = graphs_cross_val(auc_metrics) #Producing the cross_val metrics
+        model, results, auc_metrics = train_model(X_train, y_train, classifier=classifier, n_splits=n_splits, is_rebalance=is_rebalance) #auc_metrics = {test_list, proba_list}
+        fig1, fig2, best_threshold = graphs_cross_val(auc_metrics) #Producing the cross_val metrics
+        self.best_threshold[classifier] = best_threshold
 
         print(Fore.MAGENTA + "\n ✅ Training finished, saving model and graph..." + Style.RESET_ALL)
 
@@ -221,7 +228,6 @@ class ModelFlow(LoadDataMixin, DataLoader):
         file_name = f'model_V{model_iteration}_{classifier}.pkl'
         full_file_path = os.path.join(LOCAL_MODEL_PATH, file_name)
         pickle.dump(model, open(full_file_path, 'wb'))
-
 
         if is_save_graph:
             file_name = f'model_train_V{model_iteration}_{classifier}'
@@ -239,7 +245,7 @@ class ModelFlow(LoadDataMixin, DataLoader):
         print(Fore.MAGENTA + "\nSaving done..." + Style.RESET_ALL)
         print(Fore.MAGENTA + "\n  ✅ Training accomplished, well done Captain..." + Style.RESET_ALL)
 
-    def evaluate(self, file_name: str = None, target: str = "license", classifier: str="logistic") -> pd.DataFrame:
+    def evaluate(self, file_name: str = None, classifier: str="logistic") -> pd.DataFrame:
         """
         Evaluate the performance of the latest production model on processed data.\n
 
@@ -261,25 +267,23 @@ class ModelFlow(LoadDataMixin, DataLoader):
         print(Fore.MAGENTA + "\n⭐️ Use case: evaluate" + Style.RESET_ALL)
 
         #TODO Understand filename not working. file_name = class(MlFlow) instead of none
-        data_processed = DataLoader.load_processed_data(file_name=self.file_name)
-        if data_processed is None:
-            return None
 
-        y= data_processed[target]
-        X = data_processed.drop(columns=[target])
+        X_test, y_test = self.test_data
 
-        model = load_model(classifier = classifier)
+        model = self.load_model(classifier = classifier)
+        best_threshold = self.best_threshold.get(classifier)
 
         if classifier == "xgb":
             features = model["classifier"].feature_importances_
             fig = feature_importance_plotting(features)
             fig.show()
 
-        results, y_pred, y_test = evaluate_model(model, X, y)
+        results, y_pred, y_test = evaluate_model(model, X_test, y_test, threshold = best_threshold)
         y_test = y_test.to_numpy()
 
-        plot_confusion_matrix(y_test, y_pred)
+        plot_confusion_matrix(y_test, y_pred, threshold = best_threshold)
         probability_distribution(y_test, y_pred)
+        #metrics_on_one_plot(y_test, y_pred)
 
         model_iteration = len(os.listdir(LOCAL_EVALUATE_PATH)) + 1
         file_name = f'model_evaluate_V{model_iteration}'

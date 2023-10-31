@@ -29,7 +29,7 @@ hex_colors.reverse()
 
 #Look into multiple inheritance in this case
 
-def plot_confusion_matrix(test_array: np.ndarray, target_array: np.ndarray, width: int= 600, height: int= 600) -> go.Figure:
+def plot_confusion_matrix(test_array: np.ndarray, target_array: np.ndarray, threshold: float=0.5, width: int= 600, height: int= 600) -> go.Figure:
     """
     Convenience function to print a confusion matrix with the predicted results y_pred and actual data y_true
 
@@ -58,9 +58,8 @@ def plot_confusion_matrix(test_array: np.ndarray, target_array: np.ndarray, widt
         test_array = np.concatenate(test_array)
         target_array = np.concatenate(target_array)
 
-
     if set(target_array) != set([0, 1]):
-        target_array = np.where(target_array>=0.5, 1, 0)
+        target_array = np.where(target_array>=threshold, 1, 0)
 
     labels = sorted(list(set(test_array)))
 
@@ -71,7 +70,7 @@ def plot_confusion_matrix(test_array: np.ndarray, target_array: np.ndarray, widt
     )
 
     #Get results as proportion of total results
-    df_lambda = df_lambda/len(test_array)
+    df_lambda = df_lambda.div(np.sum(df_lambda, axis=1), axis=0) *100
     df_lambda = df_lambda.apply(lambda value : np.round(value, 2))
 
     acc = accuracy_score(test_array, target_array)
@@ -86,7 +85,7 @@ def plot_confusion_matrix(test_array: np.ndarray, target_array: np.ndarray, widt
                    x=[str(col) for col in df_lambda.columns],
                    y=[str(col) for col in df_lambda.columns],
                    colorscale='RdBu_r',
-                   text=df_lambda.values * 100,
+                   text=df_lambda.values,
                    texttemplate="%{text}%",
                    textfont={"size":16},
                    colorbar=dict(title='Proportion'),
@@ -467,6 +466,8 @@ def metrics_on_one_plot(test_array: list, target_array: list) -> go.Figure:
 
     fig.show()
 
+    return thresholds[max_indices[3]]
+
 def feature_importance_plotting(features: np.ndarray) -> go.Scatter:
     """
     _summary_
@@ -509,7 +510,7 @@ def probability_distribution(test_array: list, target_array: list) -> go.Histogr
     """
     fig = px.histogram(x = target_array, color = test_array,
                        color_discrete_sequence=[hex_colors[0], hex_colors[-1]], marginal="violin",
-                       nbins=20)
+                       nbins=40)
 
     fig.update_layout(title="Probability distribution by class",
                       xaxis_title="Output probabilities",
@@ -518,14 +519,14 @@ def probability_distribution(test_array: list, target_array: list) -> go.Histogr
 
     return fig
 
-def graphs_cross_val(auc_metrics: dict, n_splits: int= 5):
+def graphs_cross_val(auc_metrics: dict, n_splits: int=5):
     """
     Centralises the calls for the various graph functions in one place
 
     Parameters
     ----------
     auc_metrics : dict
-        A dictionnary containing lists of lists for respectively y_test, y_pred or y_proba by cv fold
+        A dictionnary containing lists of lists for respectively y_test, y_proba by cv fold
     n_splits : int, optional
         Number of folds by cv, by default 5
 
@@ -540,10 +541,13 @@ def graphs_cross_val(auc_metrics: dict, n_splits: int= 5):
     sample_length = len(auc_metrics.get("test_array"))
     sample = np.random.choice(sample_length, int(sample_length/2), replace=False)
 
-    #p.array(v)[[sample], :].reshape(len(sample), len(v[0])
-    auc_metrics = {k : [list(val) for i, val in enumerate(v) if i in sample] for k, v in auc_metrics.items()}
-
     plot_confusion_matrix(**auc_metrics)
-    metrics_on_one_plot(**auc_metrics)
 
-    return (_auc_curve(**auc_metrics, n_splits=n_splits), _prc_curve(**auc_metrics, n_splits=n_splits))
+
+    auc_metrics = {k : [list(val) for i, val in enumerate(v) if i in sample] for k, v in auc_metrics.items()}
+    best_threshold = metrics_on_one_plot(**auc_metrics)
+
+    return (_auc_curve(**auc_metrics, n_splits=n_splits), _prc_curve(**auc_metrics, n_splits=n_splits), best_threshold)
+
+class FigureFactory():
+    pass
