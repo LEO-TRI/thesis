@@ -270,7 +270,7 @@ class ModelFlow(LoadDataMixin, DataLoader):
 
         X_test, y_test = self.test_data
 
-        model = self.load_model(classifier = classifier)
+        model = load_model(classifier = classifier)
         best_threshold = self.best_threshold.get(classifier)
 
         if classifier == "xgb":
