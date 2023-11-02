@@ -58,19 +58,31 @@ class ModelFlow(LoadDataMixin, DataLoader):
     Inherits the loading functions from DataLoader thanks to the mixin LoadDataMixin
     """
 
-    def __init__(self, file_name = None, target = "license", test_split=0.3) -> None:
+    def __init__(self, file_name: str=None, target="license", test_split: float=0.3) -> None:
+        """
+        Initiates a ModelFlow class. ModelFlow is used to avoid data leakages
+        by holding train and test sets and then pulling on them depending on needs.
+
+        Parameters
+        ----------
+        file_name : str, optional
+            The file from which to pull data, by default None
+        target : str, optional
+            The target feature, by default "license"
+        test_split : float, optional
+            The train/test split, by default 0.3
+        """
         super().__init__() #Brings back load_raw_data. Used as a test for mixin
         self.file_name = None
         self.best_threshold = dict()
         self.test_data = None
-        self.test_size=0.3
+        self.test_size=test_split
         self.load_model = load_model
 
         X, y = self.prep_data(file_name=file_name, target=target)
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_split, random_state=1830, stratify=y)
         self.test_data = (X_test, y_test)
         self.train_data = (X_train, y_train)
-        
 
     def preprocess(self, has_model: bool=True) -> pd.DataFrame:
         """
@@ -102,7 +114,17 @@ class ModelFlow(LoadDataMixin, DataLoader):
         data_clean = preprocess_data(df)
         #data_clean = data_clean.sample(frac=0.1)
 
-        print(Fore.MAGENTA + "\n prepocess Part 1 done"+ Style.RESET_ALL)
+        df_attendance = pd.read_csv("/home/leotricaud/code/LEO-TRI/perso_projects/thesis/data/attendance.csv", sep=";")
+        df_attendance.columns = ["venue", "visitors", "latitude", "longitude"]
+
+        coordinates_tree = (df_attendance[["latitude"]].values, df_attendance[["longitude"]].values)
+        coordinates_targets = (data_clean[["latitude"]].values, data_clean[["longitude"]].values)
+
+        data_clean["monument"] = add_distance(coordinates_tree, coordinates_targets)
+        data_clean = data_clean.drop(columns = ["latitude", "longitude"], axis=1)
+
+        print(Fore.MAGENTA + "\n preprocess Part 1 done"+ Style.RESET_ALL)
+
 
         if has_model:
             data_clean = clean_target_feature(data_clean)
@@ -124,9 +146,8 @@ class ModelFlow(LoadDataMixin, DataLoader):
         return data_clean_pred
 
     #####MODEL#####
-    def optimise(self, 
-                 file_name: str = None, 
-                 classifier: list[str]=None, 
+    def optimise(self,
+                 classifier: list[str]=None,
                  n_iter: int=50):
         """
         A method to perform hyperparameters tuning on several classifiers
@@ -135,11 +156,11 @@ class ModelFlow(LoadDataMixin, DataLoader):
 
         Parameters
         ----------
-        file_name : str, optional
-            The file from which to pull the processed data, if None returns the latest file, by default None
         classifiers : list[str], optional
             The classifier to use ('logistic', 'gbt', 'random_forest'), if None will test all, by default None
             Must be passed as a list even if only one classifier is passed.
+        n_iter: int, optional
+            Number of iterations from RandomizedSearch, by default 50
 
         Returns
         -------
@@ -186,7 +207,7 @@ class ModelFlow(LoadDataMixin, DataLoader):
         return tuned_results.get(best_model_ind) #Return the best model
 
 
-    def train(self, 
+    def train(self,
               file_name: str = None,
               n_splits: int=5,
               classifier: str="logistic",
@@ -209,10 +230,12 @@ class ModelFlow(LoadDataMixin, DataLoader):
             The train test split, by default 0.3
         classifier : str, optional
             The classifier to use in the pipeline ('logistic', 'gbt', 'random_forest', 'gNB', 'xgb', or 'stacked'), by default 'logistic'.
+        is_save_graph: bool, by default False
+            Whether to save the outputed graphs locally
         """
 
         print(Fore.MAGENTA + "\n⭐️ Use case: train" + Style.RESET_ALL)
-        
+
         print(Fore.MAGENTA + "\nLoading preprocessed validation data..." + Style.RESET_ALL)
         X_train, y_train = self.train_data
 

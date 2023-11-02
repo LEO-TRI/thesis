@@ -11,7 +11,7 @@ from nltk.corpus import stopwords
 
 class SpacyClean:
     """
-    Cleaning class built around 2 Spacy pipelines. 
+    Cleaning class built around 2 Spacy pipelines.
     """
 
     def __init__(self):
@@ -27,16 +27,16 @@ class SpacyClean:
         self.nlp_fr = spacy.load(('fr_core_news_sm'))
         self.nlp_fr.remove_pipe('ner')
 
-    def preprocess_spacy(self, alpha: np.array) -> np.array:
+    def preprocess_spacy(self, alpha: np.ndarray, batch_size: int=128) -> list:
         """
         Function using Spacy to lemmatize the text. Discriminates between french and english texts.
-        
+
         Returns the lemmatized version of words when those words are NOUN, VERB and ADJ.
 
         Parameters
         ----------
         alpha : array_like
-            A text column of a pd.DataFrame. Each cell must be a string. 
+            A text column of a pd.DataFrame. Each cell must be a string.
 
         Returns
         -------
@@ -46,26 +46,22 @@ class SpacyClean:
         mask: np.array
             An array of ints, each number being an indice. Used to track which texts weren't in French or English and drop them later.
         """
-        docs = list()
-        mask = list()
         alpha = [str(text) for text in alpha]
-        for ind, doc in tqdm(enumerate(self.nlp_en.pipe(alpha, batch_size=128))):
-            tokens = list()
-            if doc._.language == "en":
-                for token in doc:
-                    if token.pos_ in ['NOUN', 'VERB', 'ADJ']:
-                        tokens.append(token.lemma_)
-                docs.append(' '.join(tokens))
-                mask.append(ind)
-            else:
-                for token in self.nlp_fr(doc.text):
-                    if token.pos_ in ['NOUN', 'VERB', 'ADJ']:
-                        tokens.append(token.lemma_)
-                docs.append(' '.join(tokens))
-                mask.append(ind)
 
-        return docs
+        for batch in tqdm((alpha[i:i + batch_size] for i in range(0, len(alpha), batch_size))):
+            for doc in self.nlp_en.pipe(batch):
+                tokens = []
+                if doc._.language == "en":
+                    for token in doc:
+                        if token.pos_ in ['NOUN', 'VERB', 'ADJ']:
+                            tokens.append(token.lemma_)
+                    yield ' '.join(tokens)
 
+                else:
+                    for token in self.nlp_fr(doc.text):
+                        if token.pos_ in ['NOUN', 'VERB', 'ADJ']:
+                            tokens.append(token.lemma_)
+                    yield ' '.join(tokens)
 
 class CleanData:
     """
@@ -87,14 +83,14 @@ class CleanData:
         """
         Cleans the text.
 
-        Remove punctuations and stopwords and proper nouns. 
+        Remove punctuations and stopwords and proper nouns.
 
-        Less accurate than SpacyClean.preprocess_spacy but a lot faster. 
+        Less accurate than SpacyClean.preprocess_spacy but a lot faster.
 
         Parameters
         ----------
         text : str
-            A text to be cleaned, in string format 
+            A text to be cleaned, in string format
 
         Returns
         -------
@@ -142,7 +138,7 @@ class CleanData:
     def clean_price(self, text: str) -> float:
         """
         Function used to transform the price column from string to number.
-        
+
         The function removes the dollar sign and rework the , vs . separating scheme.
 
         Parameters

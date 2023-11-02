@@ -11,7 +11,7 @@ from sklearn.compose import ColumnTransformer
 
 from sklearn.naive_bayes import GaussianNB
 from sklearn.ensemble import HistGradientBoostingClassifier , RandomForestClassifier, StackingClassifier, VotingClassifier
-from sklearn.linear_model import LogisticRegression, SGDClassifier
+from sklearn.linear_model import LogisticRegression
 
 from imblearn.pipeline import Pipeline
 from imblearn.under_sampling import RandomUnderSampler
@@ -23,14 +23,11 @@ from scripts_thesis.model_ML import print_results
 
 
 class AdvancedPipeline():
-    def __init__(self, classifier: list[str], numeric_cols: list[str], text_cols: list[str], other_cols: list[str], size: int=2) -> None:
+    def __init__(self, classifier, model) -> None:
         self.classifier = classifier
-        self.model = self.combine_branches(classifier,
-                                           numeric_cols,
-                                           text_cols,
-                                           other_cols,
-                                           size)
+        self.model = model
 
+    @staticmethod
     def build_preprocessing(numeric_cols: list[str],
                             text_cols: list[str],
                             other_cols: list[str],
@@ -111,13 +108,12 @@ class AdvancedPipeline():
 
         return pipeline
 
-
-    def add_classifier(self, classifier, pipeline):
+    @staticmethod
+    def add_classifier(classifier: str, pipeline: Pipeline):
         #Set the "head" of the pipeline from the potential classifiers
         classifiers = dict(logistic= LogisticRegression(penalty='l2', C=0.9, random_state=1830, solver='liblinear', max_iter=1000, class_weight="balanced"),
                         gbt= HistGradientBoostingClassifier(random_state=1830),
                         random_forest= RandomForestClassifier(random_state=1830, class_weight="balanced"),
-                        sgd= SGDClassifier(random_state=1830, max_iter=1000),
                         xgb=xgb.XGBClassifier(random_state=1830, tree_method="hist"),
                         gNB = GaussianNB()
                         )
@@ -143,8 +139,10 @@ class AdvancedPipeline():
             pipeline.steps.append(['dense', sparse_to_dense_transformer])
 
         pipeline.steps.append(['classifier', classifier_model])
+        return pipeline
 
-    def combine_branches(self,
+    @classmethod
+    def build_pipeline(cls,
                          classifier: list[str],
                          numeric_cols: list[str],
                          text_cols: list[str],
@@ -157,13 +155,13 @@ class AdvancedPipeline():
         full_model = []
 
         for i, model in enumerate(classifier):
-            pipe = self.build_preprocessing(numeric_cols, text_cols, other_cols)
-            pipe = self.add_classifier(model, pipe)
+            pipe = AdvancedPipeline.build_preprocessing(numeric_cols, text_cols, other_cols)
+            pipe = AdvancedPipeline.add_classifier(model, pipe)
             full_model.append((f'pipe_{i}', pipe))
 
-        VotingClassifier(estimators=full_model, voting="soft")
+        vc = VotingClassifier(estimators=full_model, voting="soft")
 
-        return VotingClassifier(estimators=full_model, voting="soft")
+        return AdvancedPipeline(classifier, vc)
 
     def make_output(self, X, y, n_splits: int=5):
 
@@ -175,25 +173,20 @@ class AdvancedPipeline():
         test_list = []
 
         #Filters for models that cannot produce probabilities estimates
-        has_proba = True
 
         for fold, (train, test) in enumerate(cv.split(X, y)):
             start_time = time.time()  # Record the start time
 
             pipe_model.fit(X.iloc[train,:], y[train])
             y_pred = pipe_model.predict(X.iloc[test,:])
-            res.append(print_results(y[test], y_pred, verbose=False, fold=fold))
 
             test_list.append(y[test])
-
-            if has_proba:
-                y_proba = pipe_model.predict_proba(X.loc[test,:])
-                pred_list.append(y_proba[:,1])
-            else :
-                pred_list.append(y_pred)
+            pred_list.append(y_pred)
 
 
             end_time = time.time()  # Record the end time
             elapsed_time = end_time - start_time  # Calculate elapsed time
 
             print(f"CV Number {fold + 1} done. Time elapsed: {elapsed_time:.2f} seconds")
+
+            return (test_list, pred_list)

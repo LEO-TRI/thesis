@@ -41,7 +41,8 @@ class GraphLoader:
             df_graph = df_graph.loc[:, ["id", "group", "group_count", "c_quinsee", "license",
                                 "room_type", "count_obj", "price", "description", "number_of_reviews",
                                 "first_review", "last_review", "minimum_nights", "review_scores_rating",
-                                'host_id', 'calculated_host_listings_count', 'property_type', 'availability_365']]
+                                'host_id', 'calculated_host_listings_count', 'property_type', 'availability_365',
+                                "latitude", "longitude"]]
 
         df_geo = self.get_geodata()
 

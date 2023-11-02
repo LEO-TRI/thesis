@@ -1,7 +1,10 @@
 import pandas as pd
 import numpy as np
 from thefuzz import fuzz
+
 from scripts_thesis.cleaning import CleanData, SpacyClean
+from scripts_thesis.distance_calculation import CoordinateCounterTree
+
 from tqdm import tqdm
 import string
 
@@ -160,7 +163,8 @@ def preprocess_data(df:pd.DataFrame) -> pd.DataFrame:
 
 ###Additional preproc for model preparation###
 
-def clean_variables_features(df: pd.DataFrame, reviews: pd.DataFrame, features: [str] = None, train_set:bool = True) -> pd.DataFrame:
+def clean_variables_features(df: pd.DataFrame, reviews: pd.DataFrame = None,
+                             features: [str] = None, train_set:bool = True) -> pd.DataFrame:
 
     if train_set:
         upper_bound = np.quantile(df["price"], 0.75) * 10
@@ -186,7 +190,7 @@ def clean_variables_features(df: pd.DataFrame, reviews: pd.DataFrame, features: 
     df['special_char_count'] = [sum(char in string.punctuation for char in review) for review in df['host_about']]
 
     df["description"] = cd.clean_vec(df["description"].values)
-    df["description"] = sc.preprocess_spacy(df["description"].values)
+    df["description"] = [text for text in sc.preprocess_spacy(df["description"].values)]
 
     df["host_about"] = df["host_about"].fillna(" ")
 
@@ -196,7 +200,7 @@ def clean_variables_features(df: pd.DataFrame, reviews: pd.DataFrame, features: 
 
     df["has_host_about"] = np.where(df["host_about"].map(lambda row : len(row)>20), 1, 0)
     df["host_about"] = cd.clean_vec(df["host_about"].values)
-    df["host_about"] = sc.preprocess_spacy(df["host_about"].values)
+    df["host_about"] = [text for text in sc.preprocess_spacy(df["host_about"].values)]
 
     #df["comments"] = cd.clean_vec(df["comments"].values)
     #df["comments"] = sc.preprocess_spacy(df["comments"].values)
@@ -208,11 +212,23 @@ def clean_variables_features(df: pd.DataFrame, reviews: pd.DataFrame, features: 
             "reviews_per_month", "neighbourhood_cleansed",
             "host_listings_count", "description", "has_host_about",
             "host_about", "word_count", "upper_char_count", "special_char_count",
-            "time_difference", "occupancy_rate_cons"] #, "comments"]
+            "occupancy_rate_cons", "monument"] #, "comments"]
 
     df = df.loc[:, features]
 
     return df.fillna(value=np.nan)
+
+def add_distance(coordinates_tree: tuple, coordinates_targets: tuple) -> list:
+
+    cct = CoordinateCounterTree.from_data_points(*coordinates_tree)
+
+    target_lat, target_long = coordinates_targets
+    coordinates = np.concatenate([target_lat, target_long], axis=1)
+
+    res = cct.calculate_points_within_distance(coordinates, distance_km=2.5)
+    count = [len(val) for val in res]
+    return count
+
 
 def clean_target_feature(df:pd.DataFrame) -> pd.DataFrame:
 
