@@ -348,7 +348,7 @@ def to_array(obj) -> np.ndarray:
 
     return result
 
-def queue_rate(y_pred: np.ndarray, threshold: float) -> float:
+def queue_rate(y_pred: np.ndarray, threshold: float=0.5) -> float:
     """
     Computes the queue of items to be reviewed depending on a
     threshold for a classification model.

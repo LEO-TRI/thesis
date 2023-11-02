@@ -27,12 +27,12 @@ import time
 import os
 import pickle
 
-from scripts_thesis import utils 
+from scripts_thesis import utils
 from scripts_thesis.params import *
 
 from colorama import Fore, Style
 
-def print_results(y_test: np.ndarray, y_pred: np.ndarray, verbose: bool= True, fold: int=None) -> dict:
+def print_results(y_test: np.ndarray, y_pred: np.ndarray, verbose: bool= True, fold: int=None, threshold: float=0.5) -> dict:
     """
     Convenience function used to quickly compute and display the evaluation metrics of a model.
     Can be used after getting y_pred from a trained model.
@@ -60,7 +60,8 @@ def print_results(y_test: np.ndarray, y_pred: np.ndarray, verbose: bool= True, f
                    recall=np.round(recall_score(y_test, y_pred, zero_division= 0), 2),
                    f1=np.round(f1_score(y_test, y_pred, zero_division= 0), 2),
                    roc_auc=np.round(roc_auc_score(y_test, y_pred), 2),
-                   fbeta=np.round(fbeta_score(y_test, y_pred, beta=0.5), 2)
+                   fbeta=np.round(fbeta_score(y_test, y_pred, beta=0.5), 2),
+                   queue_rate = np.round(utils.queue_rate(y_pred, threshold), 4),
                    )
 
 #Add a fold parameter to know from which fold data comes from if cv
@@ -73,6 +74,7 @@ def print_results(y_test: np.ndarray, y_pred: np.ndarray, verbose: bool= True, f
         print(Fore.BLUE + f"Recall: {metrics.get('recall')}"+ Style.RESET_ALL)
         print(Fore.BLUE + f"Fbeta Score: {metrics.get('fbeta')}"+ Style.RESET_ALL)
         print(Fore.BLUE + f"ROC_AUC Score: {metrics.get('roc_auc')}"+ Style.RESET_ALL)
+        print(Fore.BLUE + f"Queue: {metrics.get('queue_rate')}"+ Style.RESET_ALL)
 
 
     return metrics
@@ -241,7 +243,7 @@ def build_pipeline(numeric_cols: list[str],
 
     return pipeline
 
-def tune_model(X_train: pd.DataFrame, 
+def tune_model(X_train: pd.DataFrame,
                y_train: pd.Series,
                max_features: int=1000, n_iter: int=20, cv: int=5, classifier: str='logistic') -> Pipeline:
     """
@@ -291,7 +293,7 @@ def tune_model(X_train: pd.DataFrame,
                                      refit="fbeta",
                                      random_state=1830,
                                      verbose=2)
-    
+
     rand_search.fit(X_train, y_train)
 
     print(Fore.BLUE + f"Precision for {classifier} is : {np.round(rand_search.best_score_, 2)}\n" + Style.RESET_ALL )
@@ -437,15 +439,15 @@ def evaluate_model(model, X: pd.DataFrame, y: pd.Series, threshold: float) -> pd
     y_pred_proba = model.predict_proba(X_test)[:,1]
     y_pred = np.where(y_pred_proba>=threshold, 1, 0)
 
-    metrics = [accuracy_score(y_test, y_pred), 
+    metrics = [accuracy_score(y_test, y_pred),
                precision_score(y_test, y_pred),
-               fbeta_score(y_test, y_pred, beta=0.5), 
+               fbeta_score(y_test, y_pred, beta=0.5),
                recall_score(y_test, y_pred, average="macro")]
 
     metrics_name = ["res_accuracy", "res_precision", "res_fbeta", "res_recall"]
 
     print(f"✅ Model evaluated")
-    print_results(y_test, y_pred)
+    print_results(y_test, y_pred, threshold)
 
     #print(f"✅ Model evaluated, accuracy: {np.round(metrics[0], 2)}, precision: {np.round(metrics[1], 2)}, recall: {np.round(metrics[2], 2)}")
 
