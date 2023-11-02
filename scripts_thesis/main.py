@@ -121,6 +121,7 @@ class ModelFlow(LoadDataMixin, DataLoader):
         coordinates_targets = (data_clean[["latitude"]].values, data_clean[["longitude"]].values)
 
         data_clean["monument"] = add_distance(coordinates_tree, coordinates_targets)
+        data_clean = data_clean.drop(columns = ["latitude", "longitude"], axis=1)
 
         print(Fore.MAGENTA + "\n preprocess Part 1 done"+ Style.RESET_ALL)
 
