@@ -101,7 +101,7 @@ class AdvancedPipeline():
 
         # Create the final preprocessing pipeline. Further steps can be added with append later
         pipeline = Pipeline([
-            ("balancing", RandomUnderSampler(random_state=1830)),
+            ("balancing", RandomUnderSampler()),
             ('preprocessing', column_transformer),
                             ]
                             )
@@ -178,7 +178,7 @@ class AdvancedPipeline():
             start_time = time.time()  # Record the start time
 
             pipe_model.fit(X.iloc[train,:], y[train])
-            y_pred = pipe_model.predict(X.iloc[test,:])
+            y_pred = pipe_model.predict_proba(X.iloc[test,:])[:, 1]
 
             test_list.append(y[test])
             pred_list.append(y_pred)
@@ -189,4 +189,4 @@ class AdvancedPipeline():
 
             print(f"CV Number {fold + 1} done. Time elapsed: {elapsed_time:.2f} seconds")
 
-            return (test_list, pred_list)
+        return (test_list, pred_list)

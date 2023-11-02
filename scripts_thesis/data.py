@@ -311,8 +311,8 @@ class LoadDataMixin():
     A test class to check how mixins work
     Is supposed to allow the ModelFlow class in main.py to inherit a method from DataLoader
     """
-    def load_raw_data(self, target :str= "listing"):
+    def load_raw_data(self, target :str="listing"):
         return super().load_raw_data(target)
 
-    def prep_data(self, file_name: str= None, target: str= "license"):
+    def prep_data(self, file_name: str= None, target: str="license"):
         return super().prep_data(file_name, target)
