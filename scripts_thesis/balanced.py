@@ -18,14 +18,19 @@ from imblearn.under_sampling import RandomUnderSampler
 
 import xgboost as xgb
 import time
+import numpy as np
+
 from scripts_thesis.utils import sparse_to_dense
 from scripts_thesis.model_ML import print_results
+from scripts_thesis.graphs import metrics_on_one_plot
 
 
 class AdvancedPipeline():
     def __init__(self, classifier, model) -> None:
         self.classifier = classifier
         self.model = model
+        self.trained_model = None
+        self.threshold = None
 
     @staticmethod
     def build_preprocessing(numeric_cols: list[str],
@@ -175,6 +180,7 @@ class AdvancedPipeline():
         #Filters for models that cannot produce probabilities estimates
 
         for fold, (train, test) in enumerate(cv.split(X, y)):
+
             start_time = time.time()  # Record the start time
 
             pipe_model.fit(X.iloc[train,:], y[train])
@@ -189,4 +195,25 @@ class AdvancedPipeline():
 
             print(f"CV Number {fold + 1} done. Time elapsed: {elapsed_time:.2f} seconds")
 
+        self.threshold = metrics_on_one_plot(test_list, pred_list)
+
+
         return (test_list, pred_list)
+
+    def train_model(self, X, y):
+        pipe_model = self.model
+
+        pipe_model = pipe_model.fit(X, y)
+
+        self.trained_model = pipe_model
+
+        return pipe_model
+
+    def evaluate(self, X_test, y_test):
+
+        y_pred = self.trained_model.predict_proba(X_test)[:, 1]
+        y_pred = np.where(y_pred >= self.threshold, 1, 0)
+
+        res = print_results(y_test, y_pred, self.threshold)
+
+        return res

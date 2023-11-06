@@ -13,8 +13,6 @@ class CoordinateCounterTree:
     @classmethod
     def from_data_points(self, latitude: list, longitude: list) -> "CoordinateCounterTree":
 
-
-
         data_coordinates = np.concatenate([to_array(latitude), to_array(longitude)], axis=1)
         data_coordinates = np.radians(data_coordinates)
 

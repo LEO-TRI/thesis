@@ -3,7 +3,7 @@ from sklearn.experimental import enable_iterative_imputer #Required to import It
 from sklearn.impute import IterativeImputer
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.model_selection import train_test_split, RepeatedStratifiedKFold, RandomizedSearchCV
-from sklearn.metrics import accuracy_score, precision_score, f1_score, recall_score, classification_report, make_scorer, roc_auc_score, fbeta_score
+from sklearn.metrics import accuracy_score, precision_score, f1_score, recall_score, classification_report, make_scorer, average_precision_score, fbeta_score
 from sklearn.feature_selection import SelectKBest, chi2
 
 from sklearn.preprocessing import RobustScaler, OneHotEncoder, FunctionTransformer
@@ -59,8 +59,8 @@ def print_results(y_test: np.ndarray, y_pred: np.ndarray, verbose: bool= True, f
                    precision=np.round(precision_score(y_test, y_pred, zero_division= 0), 2),
                    recall=np.round(recall_score(y_test, y_pred, zero_division= 0), 2),
                    f1=np.round(f1_score(y_test, y_pred, zero_division= 0), 2),
-                   roc_auc=np.round(roc_auc_score(y_test, y_pred), 2),
-                   fbeta=np.round(fbeta_score(y_test, y_pred, beta=0.5), 2),
+                   ap=np.round(average_precision_score(y_test, y_pred), 2),
+                   fbeta=np.round(fbeta_score(y_test, y_pred, beta=0.5), 4),
                    queue_rate = np.round(utils.queue_rate(y_pred, threshold), 4),
                    )
 
@@ -73,7 +73,7 @@ def print_results(y_test: np.ndarray, y_pred: np.ndarray, verbose: bool= True, f
         print(Fore.BLUE + f"Precision: {metrics.get('precision')}"+ Style.RESET_ALL)
         print(Fore.BLUE + f"Recall: {metrics.get('recall')}"+ Style.RESET_ALL)
         print(Fore.BLUE + f"Fbeta Score: {metrics.get('fbeta')}"+ Style.RESET_ALL)
-        print(Fore.BLUE + f"ROC_AUC Score: {metrics.get('roc_auc')}"+ Style.RESET_ALL)
+        print(Fore.BLUE + f"AP Score: {metrics.get('ap')}"+ Style.RESET_ALL)
         print(Fore.BLUE + f"Queue: {metrics.get('queue_rate')}"+ Style.RESET_ALL)
 
 
@@ -119,7 +119,8 @@ def build_pipeline(numeric_cols: list[str],
                    classifier: str='logistic',
                    max_features_tfidf: int=10000,
                    max_kbest: int=1000,
-                   is_rebalance: bool=False) -> Pipeline:
+                   is_rebalance: bool=False,
+                   is_oversample: bool=False) -> Pipeline:
     """
     A convenience function created to quickly build a pipeline. Requires the columns' names for the column transformer.
 
@@ -201,6 +202,7 @@ def build_pipeline(numeric_cols: list[str],
 
     if is_rebalance:
         pipeline.steps.append(("balancing", RandomUnderSampler(random_state=1830)))
+    elif is_oversample:
         pipeline.steps.append(('smote', SMOTE(random_state=1830, k_neighbors=20)))
 
     #Set the "head" of the pipeline from the potential classifiers
@@ -307,7 +309,7 @@ def train_model(X: pd.DataFrame,
                 n_splits: int=5,
                 n_repeats: int=2,
                 classifier: str='logistic',
-                is_rebalance: bool=False) -> Pipeline:
+                balancing: dict=None) -> Pipeline:
     """
     Fit the passed model with the passed data and return a fitted model, a DataFrame of metrics and a tuple (y_test, y_pred) or (y_test, y_pred, y_proba)
 
@@ -340,12 +342,15 @@ def train_model(X: pd.DataFrame,
     text_cols = ["amenities", "description", "host_about"]
     other_cols = list(set(X.columns) - set(numeric_cols) - set(text_cols))
 
+    if balancing is None:
+        balancing = {k : False for k in ["is_rebalance", "is_oversample"]}
+
     pipe_model = build_pipeline(numeric_cols,
                                 text_cols,
                                 other_cols,
                                 max_features_tfidf = max_features,
                                 classifier=classifier,
-                                is_rebalance=is_rebalance)
+                                **balancing)
 
     #Loads back the stored hyperparameters in params.py
     pipe_params = hyperparams_dict.get(classifier)
