@@ -79,6 +79,9 @@ class ModelFlow(LoadDataMixin, DataLoader):
         self.test_size=test_split
         self.load_model = load_model
 
+        self.balancing_dict = dict(is_rebalance=False,
+                              is_oversample=False)
+
         X, y = self.prep_data(file_name=file_name, target=target)
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_split, random_state=1830, stratify=y)
         self.test_data = (X_test, y_test)
@@ -208,11 +211,12 @@ class ModelFlow(LoadDataMixin, DataLoader):
 
 
     def train(self,
+              balancing: dict=None,
               file_name: str = None,
               n_splits: int=5,
               classifier: str="logistic",
-              is_rebalance: bool=False,
-              is_save_graph: bool=False) -> None:
+              is_save_graph: bool=False,
+              ) -> None:
         """
         Load data from the data folder.
 
@@ -239,9 +243,12 @@ class ModelFlow(LoadDataMixin, DataLoader):
         print(Fore.MAGENTA + "\nLoading preprocessed validation data..." + Style.RESET_ALL)
         X_train, y_train = self.train_data
 
+        if balancing is None:
+            balancing = self.balancing_dict
+
         print(Fore.MAGENTA + "\nTraining model..." + Style.RESET_ALL)
 
-        model, results, auc_metrics = train_model(X_train, y_train, classifier=classifier, n_splits=n_splits, is_rebalance=is_rebalance) #auc_metrics = {test_list, proba_list}
+        model, results, auc_metrics = train_model(X_train, y_train, classifier=classifier, n_splits=n_splits, balancing=balancing) #auc_metrics = {test_list, proba_list}
         fig1, fig2, best_threshold = graphs_cross_val(auc_metrics) #Producing the cross_val metrics
         self.best_threshold[classifier] = best_threshold
 

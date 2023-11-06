@@ -85,10 +85,10 @@ def create_occupancy_rate(df:pd.DataFrame)-> pd.DataFrame:
     df["nb_of_nights_cons"] = df["number_of_reviews"] / 0.5
     df["nb_of_nights_large"] = df["number_of_reviews"] / 0.72
 
-    df["occupancy_rate_cons"] = df["nb_of_nights_cons"] * df["minimum_nights"]/df["time_difference"]
-    df["occupancy_rate_large"] = df["nb_of_nights_large"] * df["minimum_nights"]/df["time_difference"]
-    df["occupancy_rate_large"] = np.where(df["occupancy_rate_large"]>100, 100, df["occupancy_rate_large"])
-    df["occupancy_rate_cons"] = np.where(df["occupancy_rate_cons"]>100, 100, df["occupancy_rate_cons"])
+    df["occupancy_rate_cons"] = df["nb_of_nights_cons"] * df["minimum_nights"] / df["time_difference"]
+    df["occupancy_rate_large"] = df["nb_of_nights_large"] * df["minimum_nights"] / df["time_difference"]
+    df["occupancy_rate_large"] = np.where(df["occupancy_rate_large"]>1, 1, df["occupancy_rate_large"])
+    df["occupancy_rate_cons"] = np.where(df["occupancy_rate_cons"]>1, 1, df["occupancy_rate_cons"])
 
     df["exit"] = df["last_review"] + np.timedelta64(6, 'M')
     df["entry"] = df["first_review"] - np.timedelta64(6, 'M')
@@ -185,18 +185,18 @@ def clean_variables_features(df: pd.DataFrame, reviews: pd.DataFrame = None,
 
     df["description"] = df["description"].fillna(" ")
 
-    df['word_count'] = [len(review.split()) for review in df['host_about']]
-    df['upper_char_count'] = [sum(char.isupper() for char in review) for review in df['host_about']]
-    df['special_char_count'] = [sum(char in string.punctuation for char in review) for review in df['host_about']]
+    df['word_count'] = [len(review.split()) for review in df['description']]
+    df['upper_char_count'] = [sum(char.isupper() for char in review) for review in df['description']]
+    df['special_char_count'] = [sum(char in string.punctuation for char in review) for review in df['description']]
 
     df["description"] = cd.clean_vec(df["description"].values)
     df["description"] = [text for text in sc.preprocess_spacy(df["description"].values)]
 
     df["host_about"] = df["host_about"].fillna(" ")
 
-    df['word_count'] = [len(review.split()) for review in df['host_about']]
-    df['upper_char_count'] = [sum(char.isupper() for char in review) for review in df['host_about']]
-    df['special_char_count'] = [sum(char in string.punctuation for char in review) for review in df['host_about']]
+    df['word_count_host'] = [len(review.split()) for review in df['host_about']]
+    df['upper_char_count_host'] = [sum(char.isupper() for char in review) for review in df['host_about']]
+    df['special_char_count_host'] = [sum(char in string.punctuation for char in review) for review in df['host_about']]
 
     df["has_host_about"] = np.where(df["host_about"].map(lambda row : len(row)>20), 1, 0)
     df["host_about"] = cd.clean_vec(df["host_about"].values)
