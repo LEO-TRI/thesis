@@ -17,20 +17,23 @@ LOCAL_PATHS = [LOCAL_RAW_PATH, LOCAL_DATA_PATH, LOCAL_MODEL_PATH,
 
 
 logistic_dict = {'classifier__C': 3.927997954578607, 'classifier__penalty': 'l1', 'preprocessing__text__selectkbest__k': 1700, 'preprocessing__text__text_preprocessing__text1__ngram_range': (1, 1), 'preprocessing__text__text_preprocessing__text1__norm': 'l1', 'preprocessing__text__text_preprocessing__text2__ngram_range': (1, 1), 'preprocessing__text__text_preprocessing__text2__norm': 'l2', 'preprocessing__text__text_preprocessing__text3__ngram_range': (1, 3), 'preprocessing__text__text_preprocessing__text3__norm': 'l2'}
-gbt_dict = {'classifier__l2_regularization': 0.9517239905226629,
-            'classifier__learning_rate': 0.09893355825502403,
-            'classifier__max_bins': 38,
+
+gbt_dict = {'classifier__l2_regularization': 0.08724089624421172,
+            'classifier__learning_rate': 0.1693869208177845,
+            'classifier__max_bins': 192,
             'classifier__max_depth': 3,
-            'classifier__max_iter': 141,
-            'classifier__max_leaf_nodes': 5,
-            'classifier__min_samples_leaf': 25,
-            'preprocessing__text__selectkbest__k': 1500,
-            'preprocessing__text__text_preprocessing__text1__ngram_range': (1, 1),
+            'classifier__max_iter': 129,
+            'classifier__max_leaf_nodes': 31,
+            'classifier__min_samples_leaf': 27,
+            'preprocessing__text__selectkbest__k': 1300,
+            'preprocessing__text__text_preprocessing__text1__ngram_range': (1, 3),
             'preprocessing__text__text_preprocessing__text1__norm': 'l1',
-            'preprocessing__text__text_preprocessing__text2__ngram_range': (1, 1),
-            'preprocessing__text__text_preprocessing__text2__norm': 'l2',
+            'preprocessing__text__text_preprocessing__text2__ngram_range': (1, 2),
+            'preprocessing__text__text_preprocessing__text2__norm': 'l1',
             'preprocessing__text__text_preprocessing__text3__ngram_range': (1, 1),
             'preprocessing__text__text_preprocessing__text3__norm': 'l2'}
+
+#gbt_dict = {'classifier__l2_regularization': 0.9517239905226629, 'classifier__learning_rate': 0.09893355825502403, 'classifier__max_bins': 38, 'classifier__max_depth': 3, 'classifier__max_iter': 141, 'classifier__max_leaf_nodes': 5, 'classifier__min_samples_leaf': 25, 'preprocessing__text__selectkbest__k': 1500, 'preprocessing__text__text_preprocessing__text1__ngram_range': (1, 1), 'preprocessing__text__text_preprocessing__text1__norm': 'l1', 'preprocessing__text__text_preprocessing__text2__ngram_range': (1, 1), 'preprocessing__text__text_preprocessing__text2__norm': 'l2', 'preprocessing__text__text_preprocessing__text3__ngram_range': (1, 1), 'preprocessing__text__text_preprocessing__text3__norm': 'l2'}
 #gbt_dict = {'classifier__l2_regularization': 0.9626393637566706, 'classifier__learning_rate': 0.3719726103526537, 'classifier__max_bins': 139, 'classifier__max_depth': 4, 'classifier__max_leaf_nodes': 19, 'preprocessing__text__selectkbest__k': 1500, 'preprocessing__text__text_preprocessing__text1__ngram_range': (1, 2), 'preprocessing__text__text_preprocessing__text1__norm': 'l2', 'preprocessing__text__text_preprocessing__text2__ngram_range': (1, 2), 'preprocessing__text__text_preprocessing__text2__norm': 'l2', 'preprocessing__text__text_preprocessing__text3__ngram_range': (1, 2), 'preprocessing__text__text_preprocessing__text3__norm': 'l1'}
 #gbt_dict = {'classifier__l2_regularization': 0.09399567969872136, 'classifier__learning_rate': 0.03830828475716885, 'classifier__max_bins': 77, 'classifier__max_depth': 2, 'classifier__max_leaf_nodes': 31, 'pca__n_components': 180, 'preprocessing__text__selectkbest__k': 1400, 'preprocessing__text__text_preprocessing__text1__ngram_range': (1, 2), 'preprocessing__text__text_preprocessing__text1__norm': 'l1', 'preprocessing__text__text_preprocessing__text2__ngram_range': (1, 2), 'preprocessing__text__text_preprocessing__text2__norm': 'l1', 'preprocessing__text__text_preprocessing__text3__ngram_range': (1, 1), 'preprocessing__text__text_preprocessing__text3__norm': 'l1'}
 #gbt_dict = {'classifier__l2_regularization': 0.9533783877176355, 'classifier__learning_rate': 0.010474942262980624,   'classifier__max_bins': 211, 'classifier__max_depth': 3,'classifier__max_leaf_nodes': 8,'preprocessing__text__selectkbest__k': 1100,'preprocessing__text__text_preprocessing__text1__ngram_range': (1, 3),'preprocessing__text__text_preprocessing__text1__norm': 'l2','preprocessing__text__text_preprocessing__text2__ngram_range': (1, 2),'preprocessing__text__text_preprocessing__text2__norm': 'l2','preprocessing__text__text_preprocessing__text3__ngram_range': (1, 1),'preprocessing__text__text_preprocessing__text3__norm': 'l2'}
