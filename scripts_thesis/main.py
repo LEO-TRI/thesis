@@ -159,7 +159,7 @@ class ModelFlow(LoadDataMixin, DataLoader):
 
         Parameters
         ----------
-        classifiers : list[str], optional
+        classifiers : list[str]/str, optional
             The classifier to use ('logistic', 'gbt', 'random_forest'), if None will test all, by default None
             Must be passed as a list even if only one classifier is passed.
         n_iter: int, optional
@@ -179,9 +179,9 @@ class ModelFlow(LoadDataMixin, DataLoader):
             return None
 
         if classifier is None:
-            classifier=["logistic", "gbt", "random_forest", "sgd", "gNB", "xgb", "stacked"]
+            classifier=["logistic", "gbt", "gNB", "xgb", "stacked"]
 
-        if type(classifier)==str: #Converts to list format for iteration
+        if isinstance(classifier, str): #Converts to list format for iteration
             classifier = [classifier]
 
         print(Fore.MAGENTA + f"\nTuning {len(classifier)} model(s)..." + Style.RESET_ALL)
@@ -202,12 +202,11 @@ class ModelFlow(LoadDataMixin, DataLoader):
         full_file_path = os.path.join(LOCAL_MODEL_PATH, file_name)
 
         print(tuned_results.get(best_model_ind)[0])
-        print(type(tuned_results.get(best_model_ind)[0]))
 
         with open(full_file_path, 'wb') as f:
             pickle.dump(tuned_results.get(best_model_ind)[0], f)
 
-        return tuned_results.get(best_model_ind) #Return the best model
+        return tuned_results #Return the best model
 
 
     def train(self,
