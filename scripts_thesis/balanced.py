@@ -23,6 +23,7 @@ import numpy as np
 from scripts_thesis.utils import sparse_to_dense
 from scripts_thesis.model_ML import print_results
 from scripts_thesis.graphs import metrics_on_one_plot
+from scripts_thesis.params import *
 
 
 class AdvancedPipeline():
@@ -155,16 +156,20 @@ class AdvancedPipeline():
                          size: int=2):
 
         if isinstance(classifier, str):
-            classifier = [classifier] * size
+            classifiers_list = [classifier] * size
 
         full_model = []
 
-        for i, model in enumerate(classifier):
+        for i, model in enumerate(classifiers_list):
             pipe = AdvancedPipeline.build_preprocessing(numeric_cols, text_cols, other_cols)
             pipe = AdvancedPipeline.add_classifier(model, pipe)
+
+            pipe_params = hyperparams_dict.get(classifier)
+            pipe.set_params(**pipe_params)
+
             full_model.append((f'pipe_{i}', pipe))
 
-        vc = VotingClassifier(estimators=full_model, voting="soft")
+        vc = VotingClassifier(estimators=full_model, voting="soft", n_jobs=-1)
 
         return AdvancedPipeline(classifier, vc)
 

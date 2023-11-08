@@ -490,6 +490,27 @@ def feature_importance_plotting(features: np.ndarray) -> go.Scatter:
                       yaxis_title="")
     return fig
 
+def feature_cols_plotting(features: np.ndarray, coefs_permut : np.ndarray) -> go.Scatter:
+    """
+    _summary_
+
+    Parameters
+    ----------
+    features : np.ndarray
+        _description_
+
+    Returns
+    -------
+    go.Scatter
+        _description_
+    """
+
+    fig =  px.bar(y=coefs_permut, x=features, color_discrete_sequence=hex_colors)
+    fig.update_layout(title="Feature importance Plot",
+                      xaxis_title="Columns",
+                      yaxis_title="Feature Importance")
+    return fig
+
 
 def probability_distribution(test_array: list, target_array: list) -> go.Histogram:
     """

@@ -84,6 +84,8 @@ class ModelFlow(LoadDataMixin, DataLoader):
 
         X, y = self.prep_data(file_name=file_name, target=target)
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_split, random_state=1830, stratify=y)
+        X_train["description"] = X_train["description"].str.replace("license number", "")
+
         self.test_data = (X_test, y_test)
         self.train_data = (X_train, y_train)
 
@@ -303,11 +305,6 @@ class ModelFlow(LoadDataMixin, DataLoader):
 
         model = load_model(classifier = classifier)
         best_threshold = self.best_threshold.get(classifier)
-
-        if classifier == "xgb":
-            features = model["classifier"].feature_importances_
-            fig = feature_importance_plotting(features)
-            fig.show()
 
         results, y_pred, y_test = evaluate_model(model, X_test, y_test, threshold = best_threshold)
         y_test = y_test.to_numpy()

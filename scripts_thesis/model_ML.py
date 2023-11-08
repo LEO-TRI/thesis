@@ -342,7 +342,7 @@ def train_model(X: pd.DataFrame,
     other_cols = list(set(X.columns) - set(numeric_cols) - set(text_cols))
 
     if balancing is None:
-        balancing = {k : False for k in ["is_rebalance", "is_oversample"]}
+        balancing = {k : False for k in ("is_rebalance", "is_oversample")}
 
     pipe_model = build_pipeline(numeric_cols,
                                 text_cols,
@@ -408,7 +408,7 @@ def train_model(X: pd.DataFrame,
 
     return pipe_model, res, dict(test_array=test_list, target_array=pred_list)
 
-def evaluate_model(model, X: pd.DataFrame, y: pd.Series, threshold: float) -> pd.DataFrame:
+def evaluate_model(model, X: pd.DataFrame, y: pd.Series, threshold: float = 0.5) -> pd.DataFrame:
     """
     Evaluate trained model performance on the dataset
 
