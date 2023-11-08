@@ -3,7 +3,7 @@ from sklearn.experimental import enable_iterative_imputer #Required to import It
 from sklearn.impute import IterativeImputer
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.model_selection import train_test_split, RepeatedStratifiedKFold, RandomizedSearchCV
-from sklearn.metrics import accuracy_score, precision_score, f1_score, recall_score, classification_report, make_scorer, average_precision_score, fbeta_score
+from sklearn.metrics import accuracy_score, precision_score, recall_score, classification_report, make_scorer, average_precision_score, fbeta_score
 from sklearn.feature_selection import SelectKBest, chi2
 
 from sklearn.preprocessing import RobustScaler, OneHotEncoder, FunctionTransformer
@@ -58,7 +58,6 @@ def print_results(y_test: np.ndarray, y_pred: np.ndarray, verbose: bool= True, f
     metrics = dict(accuracy=np.round(accuracy_score(y_test, y_pred), 2),
                    precision=np.round(precision_score(y_test, y_pred, zero_division= 0), 2),
                    recall=np.round(recall_score(y_test, y_pred, zero_division= 0), 2),
-                   f1=np.round(f1_score(y_test, y_pred, zero_division= 0), 2),
                    ap=np.round(average_precision_score(y_test, y_pred), 2),
                    fbeta=np.round(fbeta_score(y_test, y_pred, beta=0.5), 4),
                    queue_rate = np.round(utils.queue_rate(y_pred, threshold), 4),

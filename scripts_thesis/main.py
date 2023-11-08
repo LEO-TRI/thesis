@@ -274,6 +274,8 @@ class ModelFlow(LoadDataMixin, DataLoader):
         print(Fore.MAGENTA + "\nSaving done..." + Style.RESET_ALL)
         print(Fore.MAGENTA + "\n  ✅ Training accomplished, well done Captain..." + Style.RESET_ALL)
 
+        return model
+
     def evaluate(self, file_name: str = None, classifier: str="logistic") -> pd.DataFrame:
         """
         Evaluate the performance of the latest production model on processed data.\n
@@ -324,6 +326,13 @@ class ModelFlow(LoadDataMixin, DataLoader):
 
         return results
 
+    def feature_explainer(self, classifier: str):
+        model = load_model(classifier = classifier)
+
+        #return feature_explainer(classifier = classifier)
+
+
+
     def pred(self, X_pred:pd.DataFrame = None) -> np.array:
         """
         Make a prediction using the latest trained model and provided data.
@@ -360,6 +369,9 @@ class ModelFlow(LoadDataMixin, DataLoader):
         print("\n✅ Proba: ", y_pred_proba, "\n")
 
         return y_pred
+
+
+
 
     @staticmethod
     def model_viz()-> None:
