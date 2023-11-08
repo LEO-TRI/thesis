@@ -189,6 +189,7 @@ def clean_variables_features(df: pd.DataFrame, reviews: pd.DataFrame = None,
     df['upper_char_count'] = [sum(char.isupper() for char in review) for review in df['description']]
     df['special_char_count'] = [sum(char in string.punctuation for char in review) for review in df['description']]
 
+    df["description"] = df["description"].str.replace("license number", "")
     df["description"] = cd.clean_vec(df["description"].values)
     df["description"] = [text for text in sc.preprocess_spacy(df["description"].values)]
 
