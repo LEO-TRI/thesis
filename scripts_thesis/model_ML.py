@@ -399,6 +399,7 @@ def train_model(X: pd.DataFrame,
 
     res = pd.DataFrame(res)
 
+    print(f"Producing an instance of the trained model")
     pipe_model.fit(X_train, y_train)
 
     #size_data = y_train.value_counts().sort_values(ascending=False).iloc[0] * 16
